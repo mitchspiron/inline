@@ -1,20 +1,47 @@
 /**
- * Overlay d'édition — lot 0 : texte seul.
+ * Overlay d'édition — texte et richtext.
  *
- * Chargé uniquement quand le site est construit en mode édition. Dans un build
- * normal, ce fichier n'est ni référencé ni émis.
+ * Chargé uniquement quand le témoin d'édition est posé, donc après une
+ * authentification réussie. Sur une page publique, ce fichier n'est jamais
+ * téléchargé.
  *
  * Principe : un chemin (`data-cms`), un pointeur dans le JSON, une mutation.
  */
 import { mountUi, type Ui } from './bar';
-import { clearDraft, formatSavedAt, readDraft, writeDraft } from './draft';
+import { clearDraft, formatSavedAt, readDraft, writeDraft, type FieldEdit } from './draft';
 import { loadContent, publish } from './api';
+import { sanitizeRichtext, sanitizeText } from './sanitize';
+import { createToolbar, type RichCommand, type StyleChange } from './toolbar';
+import {
+  ALIGNMENTS,
+  COLORS,
+  SIZES,
+  WEIGHTS,
+  styleClasses,
+  type StyleTokens,
+} from '../lib/style-tokens';
 
 interface Context {
   file: string;
   locale: string;
   page: string;
 }
+
+type FieldKind = 'text' | 'richtext';
+
+interface Zone {
+  path: string;
+  element: HTMLElement;
+  kind: FieldKind;
+}
+
+const DEFAULT_STYLE: StyleTokens = {
+  size: 'base',
+  weight: 'regular',
+  italic: false,
+  align: 'left',
+  color: 'primary',
+};
 
 function readContext(): Context | null {
   const { cmsFile, cmsLocale, cmsPage } = document.body.dataset;
@@ -35,27 +62,59 @@ function resolve(source: any, path: string): { parent: any; key: string } | null
   return { parent: node, key };
 }
 
-function start(context: Context): void {
-  const elements = new Map<string, HTMLElement>();
-  for (const element of document.querySelectorAll<HTMLElement>('[data-cms]')) {
-    elements.set(element.dataset.cms!, element);
+/** Relit les tokens de style depuis les classes posées au build. */
+function styleFromElement(element: HTMLElement): StyleTokens {
+  const has = (name: string) => element.classList.contains(name);
+  return {
+    size: SIZES.find((value) => has(`cms-size-${value}`)) ?? DEFAULT_STYLE.size,
+    weight: WEIGHTS.find((value) => has(`cms-weight-${value}`)) ?? DEFAULT_STYLE.weight,
+    italic: has('cms-italic'),
+    align: ALIGNMENTS.find((value) => has(`cms-align-${value}`)) ?? DEFAULT_STYLE.align,
+    color: COLORS.find((value) => has(`cms-color-${value}`)) ?? DEFAULT_STYLE.color,
+  };
+}
+
+function applyStyle(element: HTMLElement, style: StyleTokens): void {
+  for (const name of Array.from(element.classList)) {
+    if (name.startsWith('cms-size-') || name.startsWith('cms-weight-') ||
+        name.startsWith('cms-align-') || name.startsWith('cms-color-') || name === 'cms-italic') {
+      element.classList.remove(name);
+    }
   }
-  if (elements.size === 0) return;
+  element.classList.add(...styleClasses(style));
+}
+
+function start(context: Context): void {
+  const zones = new Map<string, Zone>();
+  for (const element of document.querySelectorAll<HTMLElement>('[data-cms]')) {
+    const path = element.dataset.cms!;
+    const kind: FieldKind = element.dataset.cmsType === 'richtext' ? 'richtext' : 'text';
+    zones.set(path, { path, element, kind });
+  }
+  if (zones.size === 0) return;
 
   /** Valeurs de référence : celles du dépôt une fois le contenu chargé. */
-  const baseline: Record<string, string> = {};
-  for (const [path, element] of elements) {
-    baseline[path] = element.textContent ?? '';
+  const baseValues: Record<string, string> = {};
+  const baseStyles: Record<string, StyleTokens> = {};
+  for (const zone of zones.values()) {
+    baseValues[zone.path] =
+      zone.kind === 'richtext' ? zone.element.innerHTML : (zone.element.textContent ?? '');
+    if (zone.kind === 'text') baseStyles[zone.path] = styleFromElement(zone.element);
   }
 
-  /** Modifications en cours, uniquement celles qui diffèrent de la référence. */
-  let edits: Record<string, string> = {};
-  /** Contenu du fichier tel qu'il est dans le dépôt, et son empreinte de version. */
+  /** Modifications en cours, uniquement ce qui diffère de la référence. */
+  let edits: Record<string, FieldEdit> = {};
   let source: Record<string, any> | null = null;
   let version = '';
   let saveTimer: number | undefined;
+  let active: Zone | null = null;
 
   const ui: Ui = mountUi({ onPublish: doPublish, onReset: doReset });
+  const toolbar = createToolbar({ onStyle: applyStyleChange, onCommand: runCommand });
+
+  function currentStyle(path: string): StyleTokens {
+    return { ...(baseStyles[path] ?? DEFAULT_STYLE), ...(edits[path]?.style ?? {}) };
+  }
 
   function markDirty(): void {
     ui.setDirty(Object.keys(edits).length > 0);
@@ -63,58 +122,166 @@ function start(context: Context): void {
     saveTimer = window.setTimeout(() => writeDraft(context.file, edits), 250);
   }
 
+  /** Retire une entrée devenue identique à la référence. */
+  function prune(path: string): void {
+    const edit = edits[path];
+    if (!edit) return;
+    if (edit.value !== undefined && edit.value === baseValues[path]) delete edit.value;
+    if (edit.style && Object.keys(edit.style).length === 0) delete edit.style;
+    if (edit.value === undefined && !edit.style) delete edits[path];
+  }
+
   function setValue(path: string, value: string): void {
-    if (value === baseline[path]) delete edits[path];
-    else edits[path] = value;
+    edits[path] = { ...edits[path], value };
+    prune(path);
     markDirty();
+  }
+
+  function applyStyleChange(change: StyleChange): void {
+    if (!active || active.kind !== 'text') return;
+    const path = active.path;
+
+    const merged = { ...(edits[path]?.style ?? {}), ...change };
+    // Un aller-retour ramenant la valeur d'origine n'est pas une modification.
+    for (const [token, value] of Object.entries(merged)) {
+      if ((baseStyles[path] as any)?.[token] === value) delete (merged as any)[token];
+    }
+
+    edits[path] = { ...edits[path], style: merged };
+    prune(path);
+
+    applyStyle(active.element, currentStyle(path));
+    toolbar.showForText(active.element, currentStyle(path));
+    markDirty();
+  }
+
+  function runCommand(command: RichCommand): void {
+    if (!active || active.kind !== 'richtext') return;
+    active.element.focus();
+
+    if (command === 'link') {
+      const href = window.prompt('Adresse du lien (par exemple https://exemple.fr)');
+      if (!href) return;
+      document.execCommand('createLink', false, href);
+    } else {
+      const commands: Record<Exclude<RichCommand, 'link'>, string> = {
+        bold: 'bold',
+        italic: 'italic',
+        bullets: 'insertUnorderedList',
+        numbers: 'insertOrderedList',
+      };
+      document.execCommand(commands[command as Exclude<RichCommand, 'link'>], false);
+    }
+
+    // Le navigateur produit ce qu'il veut ; on ne garde que la liste blanche.
+    const cleaned = sanitizeRichtext(active.element.innerHTML);
+    active.element.innerHTML = cleaned;
+    setValue(active.path, cleaned);
   }
 
   // --- Édition ------------------------------------------------------------
 
-  for (const [path, element] of elements) {
+  for (const zone of zones.values()) {
+    const { element, path, kind } = zone;
+
     element.addEventListener('click', (event) => {
-      if (element.getAttribute('contenteditable') === 'true') return;
-      event.preventDefault();
-      // Attribut plutôt que propriété : c'est lui que cible le style de l'overlay.
-      element.setAttribute('contenteditable', 'true');
-      element.focus();
+      if (element.getAttribute('contenteditable') !== 'true') {
+        event.preventDefault();
+        element.setAttribute('contenteditable', 'true');
+        element.focus();
+      }
+      active = zone;
+      if (kind === 'text') toolbar.showForText(element, currentStyle(path));
+      else toolbar.showForRichtext(element);
     });
 
-    element.addEventListener('input', () => setValue(path, element.textContent ?? ''));
+    element.addEventListener('input', () => {
+      setValue(path, kind === 'richtext' ? element.innerHTML : (element.textContent ?? ''));
+    });
 
-    element.addEventListener('blur', () => {
+    element.addEventListener('blur', (event) => {
+      // Cliquer dans la barre d'outils n'est pas quitter le champ.
+      const next = (event as FocusEvent).relatedTarget;
+      if (next instanceof Node && toolbar.contains(next)) return;
+
       element.removeAttribute('contenteditable');
+      toolbar.hide();
+      if (active === zone) active = null;
+
+      if (kind === 'richtext') {
+        const cleaned = sanitizeRichtext(element.innerHTML);
+        if (cleaned !== element.innerHTML) element.innerHTML = cleaned;
+        setValue(path, cleaned);
+      }
     });
 
     element.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        element.blur();
+        return;
+      }
       // Un champ texte est une chaîne : ni retour à la ligne, ni mise en forme.
-      if (event.key === 'Enter' || event.key === 'Escape') {
+      if (kind === 'text' && event.key === 'Enter') {
         event.preventDefault();
         element.blur();
       }
     });
 
-    // Collage depuis un traitement de texte : on ne garde que les caractères.
+    /**
+     * Collage. C'est le geste qui casse une charte graphique : le contenu
+     * arrive avec ses polices, ses tailles et ses couleurs. On ne conserve
+     * jamais la mise en forme d'origine.
+     */
     element.addEventListener('paste', (event) => {
       event.preventDefault();
-      const text = (event.clipboardData?.getData('text/plain') ?? '').replace(/\s+/g, ' ');
-      document.execCommand('insertText', false, text);
+      const clipboard = event.clipboardData;
+      if (!clipboard) return;
+
+      if (kind === 'text') {
+        const text = sanitizeText(clipboard.getData('text/plain'));
+        document.execCommand('insertText', false, text);
+        setValue(path, element.textContent ?? '');
+        return;
+      }
+
+      const html = clipboard.getData('text/html');
+      const cleaned = html
+        ? sanitizeRichtext(html)
+        : sanitizeText(clipboard.getData('text/plain'));
+      document.execCommand('insertHTML', false, cleaned);
+
+      const settled = sanitizeRichtext(element.innerHTML);
+      element.innerHTML = settled;
+      setValue(path, settled);
     });
   }
 
   // --- Brouillon local ----------------------------------------------------
+
+  function applyEditToDom(path: string, edit: FieldEdit): void {
+    const zone = zones.get(path);
+    if (!zone) return;
+    if (edit.value !== undefined) {
+      if (zone.kind === 'richtext') zone.element.innerHTML = sanitizeRichtext(edit.value);
+      else zone.element.textContent = edit.value;
+    }
+    if (zone.kind === 'text') applyStyle(zone.element, currentStyle(path));
+  }
 
   function applyDraft(): void {
     const draft = readDraft(context.file);
     if (!draft) return;
 
     let applied = 0;
-    for (const [path, value] of Object.entries(draft.fields)) {
-      const element = elements.get(path);
-      if (!element || value === baseline[path]) continue;
-      element.textContent = value;
-      edits[path] = value;
-      applied += 1;
+    for (const [path, edit] of Object.entries(draft.fields)) {
+      if (!zones.has(path)) continue;
+      edits[path] = edit;
+      prune(path);
+      if (edits[path]) {
+        applyEditToDom(path, edits[path]);
+        applied += 1;
+      }
     }
     if (applied === 0) {
       clearDraft(context.file);
@@ -138,11 +305,15 @@ function start(context: Context): void {
     if (!confirmed) return;
 
     for (const path of Object.keys(edits)) {
-      const element = elements.get(path);
-      if (element) element.textContent = baseline[path] ?? '';
+      const zone = zones.get(path);
+      if (!zone) continue;
+      if (zone.kind === 'richtext') zone.element.innerHTML = baseValues[path] ?? '';
+      else zone.element.textContent = baseValues[path] ?? '';
+      if (zone.kind === 'text') applyStyle(zone.element, baseStyles[path] ?? DEFAULT_STYLE);
     }
     edits = {};
     clearDraft(context.file);
+    toolbar.hide();
     ui.clearBanner();
     ui.setDirty(false);
   }
@@ -169,22 +340,21 @@ function start(context: Context): void {
     version = loaded.version;
 
     // La référence, c'est le dépôt — pas le HTML construit, qui peut dater.
-    for (const [path, element] of elements) {
-      const target = resolve(source, path);
+    for (const zone of zones.values()) {
+      const target = resolve(source, zone.path);
       if (!target) {
-        console.warn(`[editor] chemin absent du contenu : ${path}`);
+        console.warn(`[editor] chemin absent du contenu : ${zone.path}`);
         continue;
       }
-      const value = String(target.parent[target.key].value ?? '');
-      baseline[path] = value;
-      if (path in edits) {
-        if (edits[path] === value) {
-          delete edits[path];
-          element.textContent = value;
-        }
-      } else {
-        element.textContent = value;
+      const field = target.parent[target.key];
+      baseValues[zone.path] = String(field.value ?? '');
+      if (zone.kind === 'text' && field.style) {
+        baseStyles[zone.path] = { ...DEFAULT_STYLE, ...field.style };
       }
+
+      prune(zone.path);
+      if (edits[zone.path]) applyEditToDom(zone.path, edits[zone.path]);
+      else applyEditToDom(zone.path, { value: baseValues[zone.path] });
     }
     markDirty();
   }
@@ -212,13 +382,24 @@ function start(context: Context): void {
     }
 
     ui.clearBanner();
+    toolbar.hide();
     ui.setBusy(true);
 
     const next = JSON.parse(JSON.stringify(source));
     for (const path of paths) {
       const target = resolve(next, path);
       if (!target) continue;
-      target.parent[target.key].value = edits[path];
+      const field = target.parent[target.key];
+      const edit = edits[path];
+      const zone = zones.get(path);
+
+      if (edit.value !== undefined) {
+        field.value =
+          zone?.kind === 'richtext' ? sanitizeRichtext(edit.value) : sanitizeText(edit.value);
+      }
+      if (edit.style && field.style) {
+        field.style = { ...field.style, ...edit.style };
+      }
     }
 
     const result = await publish({
@@ -231,11 +412,16 @@ function start(context: Context): void {
     ui.setBusy(false);
 
     if (result.status === 'published') {
-      // Une sauvegarde de brouillon encore en attente n'a plus lieu d'être.
       window.clearTimeout(saveTimer);
       source = next;
       version = result.version;
-      for (const path of paths) baseline[path] = edits[path];
+      for (const path of paths) {
+        const target = resolve(next, path);
+        if (!target) continue;
+        const field = target.parent[target.key];
+        baseValues[path] = String(field.value ?? '');
+        if (field.style) baseStyles[path] = { ...DEFAULT_STYLE, ...field.style };
+      }
       edits = {};
       clearDraft(context.file);
       ui.setDirty(false);

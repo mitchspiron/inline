@@ -1,5 +1,6 @@
 ---
-import type { Page, TextField } from '../content/schema';
+import type { Page, RichtextField, TextField } from '../content/schema';
+import { styleClasses } from '../lib/style-tokens';
 
 interface Props {
   /** Données de la page (page.data). */
@@ -17,7 +18,7 @@ const { data, path, as: Tag = 'p', class: extraClass = '' } = Astro.props;
  * Résout le chemin dans le JSON. Un `data-cms` qui pointe vers une clé absente
  * fait échouer le build — contrôle volontaire, ne pas l'assouplir (CLAUDE.md).
  */
-function resolveField(source: unknown, keyPath: string): TextField {
+function resolveField(source: unknown, keyPath: string): TextField | RichtextField {
   const node = keyPath
     .split('.')
     .reduce<any>((acc, key) => (acc == null ? undefined : acc[key]), source);
@@ -25,21 +26,20 @@ function resolveField(source: unknown, keyPath: string): TextField {
   if (node == null) {
     throw new Error(`[Editable] Le chemin « ${keyPath} » n'existe pas dans le contenu.`);
   }
-  if (node.type !== 'text') {
-    throw new Error(`[Editable] Le chemin « ${keyPath} » n'est pas un champ texte.`);
+  if (node.type !== 'text' && node.type !== 'richtext') {
+    throw new Error(
+      `[Editable] Le chemin « ${keyPath} » est de type « ${node.type} ». ` +
+        'Ce composant ne rend que du texte ; les médias ont le leur.',
+    );
   }
-  return node as TextField;
+  return node as TextField | RichtextField;
 }
 
 const field = resolveField(data, path);
-const s = field.style;
 
+// Le richtext n'a pas d'objet `style` : sa mise en forme est dans son balisage.
 const classes = [
-  `cms-size-${s.size}`,
-  `cms-weight-${s.weight}`,
-  s.italic ? 'cms-italic' : '',
-  `cms-align-${s.align}`,
-  `cms-color-${s.color}`,
+  ...(field.type === 'text' ? styleClasses(field.style) : []),
   extraClass,
 ]
   .filter(Boolean)
@@ -47,4 +47,12 @@ const classes = [
 ---
 
 {/* Rendu statique pur : aucune directive client:*, la valeur est dans le HTML brut. */}
-<Tag data-cms={path} class={classes}>{field.value}</Tag>
+{
+  field.type === 'richtext' ? (
+    <Tag data-cms={path} data-cms-type="richtext" class={classes} set:html={field.value} />
+  ) : (
+    <Tag data-cms={path} data-cms-type="text" class={classes}>
+      {field.value}
+    </Tag>
+  )
+}

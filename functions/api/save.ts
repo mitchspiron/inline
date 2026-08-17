@@ -16,6 +16,7 @@
  */
 import { pageSchema } from '../../src/content/schema';
 import { verifyAuth } from '../lib/auth';
+import { sanitizeRichtext, sanitizeText } from '../lib/sanitize';
 import { createGitProvider, GitError } from '../lib/git-provider';
 import {
   MAX_CONTENT_BYTES,
@@ -30,6 +31,38 @@ interface SavePayload {
   content: string;
   version: string;
   message: string;
+}
+
+/**
+ * Assainit toutes les valeurs de champ, en place.
+ *
+ * L'overlay nettoie déjà côté navigateur, et ça ne compte pour rien : c'est
+ * ici que se décide ce qui entre dans le dépôt. Un appel direct à cette route,
+ * sans passer par l'interface, subit exactement le même traitement.
+ */
+function sanitizeFields(node: unknown): void {
+  if (node == null || typeof node !== 'object') return;
+
+  const record = node as Record<string, unknown>;
+  if (record.type === 'richtext' && typeof record.value === 'string') {
+    record.value = sanitizeRichtext(record.value);
+    return;
+  }
+  if (record.type === 'text' && typeof record.value === 'string') {
+    record.value = sanitizeText(record.value);
+    return;
+  }
+
+  for (const child of Object.values(record)) sanitizeFields(child);
+}
+
+/** Constructions qui ne sont jamais du contenu, quelle qu'en soit l'origine. */
+const ATTACK = /<\s*(script|iframe|object|embed|form|svg|math)\b|\son[a-z]+\s*=|javascript\s*:|data\s*:\s*text\/html/i;
+
+function containsAttack(node: unknown): boolean {
+  if (typeof node === 'string') return ATTACK.test(node);
+  if (node == null || typeof node !== 'object') return false;
+  return Object.values(node as Record<string, unknown>).some(containsAttack);
 }
 
 /** Message de commit : préfixe imposé, corps borné, jamais recopié tel quel. */
@@ -76,11 +109,31 @@ export async function onRequestPost({ request, env }: FunctionContext): Promise<
     return json({ error: 'invalid_content' }, 422);
   }
 
+  /**
+   * Une tentative caractérisée est refusée, pas seulement nettoyée.
+   *
+   * Un collage depuis un traitement de texte n'apporte jamais ces
+   * constructions — l'overlay les a déjà retirées. Les voir arriver ici
+   * signifie que la route est appelée directement.
+   */
+  if (containsAttack(parsed)) {
+    console.error('[save] contenu refusé : balisage manifestement hostile');
+    return json({ error: 'invalid_content' }, 422);
+  }
+
+  // Puis on nettoie le reste — polices, classes, attributs de Word.
+  sanitizeFields(parsed);
+
   const validation = pageSchema.safeParse(parsed);
   if (!validation.success) {
     console.error('[save] contenu refusé par le schéma', validation.error.issues.slice(0, 5));
     return json({ error: 'invalid_content' }, 422);
   }
+
+  // Ce qui est écrit est exactement ce qui vient d'être validé et assaini.
+  // On repart de l'objet analysé, et non du schéma : Zod supprimerait au
+  // passage toute clé qu'il ne connaît pas encore.
+  const content = `${JSON.stringify(parsed, null, 2)}\n`;
 
   try {
     const provider = await createGitProvider(env);
@@ -92,13 +145,9 @@ export async function onRequestPost({ request, env }: FunctionContext): Promise<
       return json({ error: 'conflict' }, 409);
     }
 
-    // On écrit la chaîne reçue telle quelle : elle dérive du fichier lu dans le
-    // dépôt et seules les valeurs de texte y ont été remplacées. Ré-encoder
-    // depuis l'objet validé supprimerait silencieusement toute clé que le
-    // schéma ne connaît pas encore.
     const written = await provider.writeFile(
       payload.path,
-      payload.content,
+      content,
       payload.version,
       sanitizeMessage(payload.message, payload.path),
       resolveAuthor(env),

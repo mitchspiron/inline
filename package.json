@@ -9,17 +9,20 @@
     "bundle:editor": "esbuild src/editor/index.ts --bundle --minify --format=esm --target=es2020 --outfile=dist/editor/overlay.js",
     "preview": "astro preview",
     "check": "node scripts/check-html.mjs && node scripts/check-secrets.mjs",
-    "test": "npm run test:git && npm run test:auth && npm run build && npm run test:editor",
+    "test": "npm run test:git && npm run test:auth && npm run test:sanitize && npm run build && npm run test:editor",
     "test:git": "node scripts/test-git-provider.mjs",
     "test:auth": "node scripts/test-auth.mjs",
     "test:editor": "node scripts/test-editor.mjs",
     "serve:functions": "wrangler pages dev",
     "mock:git": "node scripts/mock-git-api.mjs",
-    "make:key": "node scripts/make-key.mjs"
+    "make:key": "node scripts/make-key.mjs",
+    "test:sanitize": "node scripts/test-sanitize.mjs"
   },
   "dependencies": {
     "@noble/hashes": "^2.3.0",
     "astro": "^5.2.5",
+    "dompurify": "^3.4.13",
+    "htmlparser2": "^12.0.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {

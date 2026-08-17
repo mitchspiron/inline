@@ -9,14 +9,20 @@
  * `zod` est ici la même instance que celle réexportée par `astro:content`.
  */
 import { z } from 'zod';
+import { ALIGNMENTS, COLORS, SIZES, WEIGHTS } from '../lib/style-tokens';
 
-/** Tokens de style. Liste blanche stricte : aucune valeur libre, aucun repli silencieux. */
+/**
+ * Tokens de style. Liste blanche stricte : aucune valeur libre, aucun repli
+ * silencieux. Les valeurs viennent de `src/lib/style-tokens.ts`, d'où la barre
+ * d'outils de l'overlay tire aussi ses boutons — un bouton hors enum est donc
+ * impossible par construction, pas par vigilance.
+ */
 export const styleSchema = z.object({
-  size: z.enum(['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl']).default('base'),
-  weight: z.enum(['thin', 'light', 'regular', 'medium', 'semibold', 'bold']).default('regular'),
+  size: z.enum(SIZES).default('base'),
+  weight: z.enum(WEIGHTS).default('regular'),
   italic: z.boolean().default(false),
-  align: z.enum(['left', 'center', 'right']).default('left'),
-  color: z.enum(['primary', 'secondary', 'muted', 'accent', 'inverse']).default('primary'),
+  align: z.enum(ALIGNMENTS).default('left'),
+  color: z.enum(COLORS).default('primary'),
 });
 
 /** Texte simple : titres, labels, paragraphes sans mise en forme. */

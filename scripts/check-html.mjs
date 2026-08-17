@@ -35,9 +35,9 @@ function decode(html) {
     .replace(/\s+/g, ' ');
 }
 
-/** Aplatit les champs texte du JSON en { chemin: valeur }. */
+/** Aplatit les champs textuels du JSON en { chemin: valeur }. */
 function collectTextFields(node, path = [], out = {}) {
-  if (node && typeof node === 'object' && node.type === 'text') {
+  if (node && typeof node === 'object' && (node.type === 'text' || node.type === 'richtext')) {
     out[path.join('.')] = node.value;
     return out;
   }

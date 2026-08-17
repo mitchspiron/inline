@@ -235,13 +235,30 @@ durée sur la route `/api/auth`.
 
 ### Ajouter un champ éditable
 
-1. Ajouter la clé dans `src/content/pages/fr/home.json`, au format
-   `{ "type": "text", "value": "…", "style": { … } }`.
+1. Ajouter la clé dans `src/content/pages/fr/home.json` :
+   - texte simple → `{ "type": "text", "value": "…", "style": { … } }`
+   - paragraphe avec emphase ou lien → `{ "type": "richtext", "value": "…" }`
 2. Poser un `<Editable data={data} path="blocks.mon.champ" as="h2" />` dans la
    page.
 
 Le build échoue si le chemin n'existe pas, et `npm run check` échoue si la
 valeur n'arrive pas dans le HTML.
+
+### Ce que le client peut modifier
+
+**Sur un champ texte**, une barre apparaît au clic : taille, épaisseur,
+italique, alignement, couleurs du thème. Ses boutons sont construits à partir
+de `src/lib/style-tokens.ts`, d'où le schéma Zod tire aussi ses enums — un
+bouton proposant une valeur que le build refuserait est donc impossible, il n'y
+a pas deux listes à tenir d'accord.
+
+**Sur un champ richtext**, la barre propose gras, italique, lien et listes.
+Rien d'autre : ce sont exactement les balises que l'assainissement laisse
+passer.
+
+**Au collage**, la mise en forme d'origine est écrasée sans exception. Un
+paragraphe collé depuis Word arrive avec ses polices, ses tailles en points et
+ses couleurs ; il ne reste que le texte, le gras et l'italique.
 
 ---
 
@@ -264,18 +281,35 @@ valeur n'arrive pas dans le HTML.
 - Messages d'erreur sans détail technique côté navigateur ; le détail va dans la
   console et les journaux serveur — jamais la clé, l'empreinte, le cookie ou le
   jeton.
+- Richtext assaini des deux côtés, sur une liste blanche de sept balises et d'un
+  seul attribut. Une agression caractérisée — script, gestionnaire d'événement,
+  `iframe`, lien `javascript:` — est refusée par la fonction, pas seulement
+  nettoyée.
+
+### Pourquoi l'assainissement serveur n'utilise pas DOMPurify
+
+DOMPurify a besoin d'un DOM, que le runtime des fonctions ne fournit pas. Avec
+un DOM en JavaScript pur (linkedom), DOMPurify **ne lève aucune erreur** : il
+passe `isSupported` à faux et renvoie son entrée telle quelle. Vérifié dans le
+runtime, un `<script>` et un `href="javascript:"` ressortaient intacts.
+
+`functions/lib/sanitize.ts` reconstruit donc le fragment depuis son analyse
+syntaxique : seule la liste blanche est réécrite, le reste n'existe pas dans le
+résultat. `npm run test:sanitize` soumet le même corpus aux deux
+implémentations et compare les sorties — c'est ce test qui garantit qu'elles ne
+divergent pas.
 
 Ce qui reste à faire : limitation de débit sur `/api/save` et `/api/upload`
-(lot 6), assainissement du richtext (lot 2).
+(lot 6).
 
 ---
 
 ## Ce qui n'est pas encore là
 
-Médias et images (lot 3), listes et collections (lot 4), multilingue (lot 5),
-barre d'outils de style et richtext assaini (lot 2). Les types correspondants
-existent déjà dans le schéma : le contenu qui les utilise sera validé, mais
-aucun composant ne les rend et aucun bouton ne les modifie.
+Médias et images (lot 3), listes et collections (lot 4), multilingue (lot 5).
+Les types correspondants existent déjà dans le schéma : le contenu qui les
+utilise sera validé, mais aucun composant ne les rend et aucun bouton ne les
+modifie.
 
 Deux fichiers manquent, faute d'objet à ce stade : `check-locales.mjs` (une
 seule locale) et l'implémentation GitLab — [gitlab.ts](functions/lib/gitlab.ts)

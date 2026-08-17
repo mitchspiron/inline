@@ -40,6 +40,31 @@ export const OVERLAY_CSS = `
 .cms-ui-banner .cms-ui-btn-ghost { color: #475467; }
 .cms-ui-banner .cms-ui-btn-ghost:hover { color: #101828; }
 
+.cms-ui-toolbar {
+  position: absolute; z-index: 2147483200;
+  display: flex; flex-wrap: wrap; gap: 10px; max-width: min(94vw, 720px);
+  padding: 8px 10px; border-radius: 10px;
+  background: #fff; border: 1px solid #d0d5dd;
+  box-shadow: 0 6px 20px rgba(16,24,40,.18);
+  font-size: 12px;
+}
+.cms-ui-toolbar[hidden] { display: none; }
+.cms-ui-tool-group { display: flex; align-items: center; gap: 3px; }
+.cms-ui-tool-label {
+  margin-right: 4px; color: #667085; font-size: 11px; text-transform: uppercase;
+  letter-spacing: .04em; white-space: nowrap;
+}
+.cms-ui-tool {
+  border: 1px solid #e4e7ec; border-radius: 6px; padding: 4px 8px;
+  font: inherit; background: #fff; color: #344054; cursor: pointer; white-space: nowrap;
+}
+.cms-ui-tool:hover { background: #f2f4f7; }
+.cms-ui-tool[aria-pressed="true"] { background: #0b5cff; border-color: #0b5cff; color: #fff; }
+.cms-ui-swatch {
+  width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 1px solid #d0d5dd;
+}
+.cms-ui-swatch[aria-pressed="true"] { outline: 2px solid #0b5cff; outline-offset: 2px; }
+
 .cms-ui-blocker {
   position: fixed; inset: 0; z-index: 2147483600; display: none;
   align-items: center; justify-content: center; padding: 32px; text-align: center;
@@ -47,6 +72,6 @@ export const OVERLAY_CSS = `
 }
 @media (max-width: 767px) {
   .cms-ui-blocker { display: flex; }
-  .cms-ui-bar, .cms-ui-banner { display: none; }
+  .cms-ui-bar, .cms-ui-banner, .cms-ui-toolbar { display: none; }
 }
 `;
