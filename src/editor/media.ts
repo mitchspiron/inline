@@ -9,6 +9,7 @@
  * Vidéo : un champ où coller un lien. Aucun fichier n'est jamais téléversé.
  */
 import { parseVideoUrl, embedUrl, type VideoReference } from '../lib/video';
+import { decodeHeic, looksLikeHeic } from './heic';
 
 /** Au-delà, on ne gagne plus rien de visible et on alourdit le dépôt. */
 const MAX_WIDTH = 2000;
@@ -79,8 +80,27 @@ export function computeCrop(
   };
 }
 
+/**
+ * Obtient des pixels, quel que soit le format.
+ *
+ * On tente d'abord le navigateur : c'est plus rapide, et Safari sait lire le
+ * HEIC nativement. En cas d'échec, si le fichier est un HEIC, on charge le
+ * décodeur — 1,4 Mo, qui ne partent que dans ce cas précis.
+ */
+async function decodeToBitmap(file: File): Promise<ImageBitmap> {
+  try {
+    return await createImageBitmap(file, { imageOrientation: 'from-image' });
+  } catch (error) {
+    const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+    if (!looksLikeHeic(head)) throw error;
+
+    console.info('[editor] photo HEIC : décodage par le module dédié');
+    return decodeHeic(file);
+  }
+}
+
 export async function prepareImage(file: File, ratio: number): Promise<PreparedImage> {
-  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  const bitmap = await decodeToBitmap(file);
   const { cropX, cropY, cropWidth, cropHeight, width, height } = computeCrop(
     bitmap.width,
     bitmap.height,
@@ -193,7 +213,7 @@ export function createMediaPanel(handlers: MediaPanelHandlers): MediaPanel {
           console.warn('[editor] image illisible', error);
           setStatus(
             status,
-            'Ce fichier n’a pas pu être lu. Essayez une photo au format JPEG ou PNG.',
+            'Ce fichier n’a pas pu être lu. Essayez une autre photo.',
             'error',
           );
           return;

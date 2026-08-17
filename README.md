@@ -80,7 +80,7 @@ npm run dev              # Serveur Astro seul — le site, sans les fonctions ni
 npm run build            # Build de production (échoue si le contenu est invalide)
 npm run serve:functions  # Site + fonctions : c'est ici qu'on édite en local
 npm run check            # Contenu bien dans le HTML brut + aucun secret dans le build
-npm run test             # Fournisseur Git, authentification, assainissement, médias, overlay
+npm run test             # Fournisseur Git, authentification, assainissement, médias, HEIC, overlay
 npm run make:key         # Génère une clé de site, son empreinte, un secret de session
 npm run mock:git         # Faux service Git local, pour essayer sans dépôt
 ```
@@ -193,6 +193,7 @@ src/components/Editable.astro    Rend un champ et pose son data-cms
 src/layouts/Base.astro       Métadonnées, éléments partagés, amorce d'édition
 src/pages/index.astro        La page
 src/pages/admin.astro        La saisie de la clé, et rien d'autre
+src/editor/heic.ts           Décodage des photos HEIC, chargé à la demande
 src/editor/                  Overlay d'édition (TypeScript vanilla, 9 Ko)
 functions/lib/auth.ts        Clé de site, sessions — seul juge de l'identité
 functions/lib/rate-limit.ts  Comptage des tentatives, stockage interchangeable
@@ -288,6 +289,29 @@ n'a pas de codec : la seule voie serait un module WebAssembly, et la compilation
 de WebAssembly à l'exécution y est interdite. Le résultat est meilleur de toute
 façon — ce qui traverse le réseau se compte en centaines de kilo-octets, et le
 dépôt ne grossit pas de photos brutes.
+
+### Les photos HEIC d'iPhone
+
+Un iPhone photographie en HEIC par défaut. Safari sait l'afficher, Chrome et
+Firefox non. Sans traitement, un client sur PC recevant une photo par AirDrop
+ou par courriel se verrait refuser son fichier — c'est-à-dire qu'on lui
+demanderait de le convertir, exactement ce que le projet s'interdit.
+
+`inline` tente d'abord le décodeur du navigateur, et ne charge le décodeur HEIC
+qu'en cas d'échec, sur un fichier reconnu HEIC **à ses octets**. Le module pèse
+1,4 Mo et ne part que dans ce cas : un client qui ne dépose jamais de HEIC ne le
+télécharge jamais. Une photo de 12 Mpx est décodée en 1,4 s environ, puis
+repasse par le chemin commun — recadrage, réduction, WebP.
+
+Le décodage complet ne peut pas être testé sans une vraie photo : aucun encodeur
+HEVC n'est disponible pour en fabriquer une, et une photo personnelle n'a rien à
+faire dans un dépôt. `npm run test:heic` vérifie donc toujours la
+reconnaissance du format, et **saute explicitement** le décodage faute
+d'échantillon. Pour l'exécuter :
+
+```bash
+INLINE_HEIC_SAMPLE=/chemin/vers/photo.heic npm run test:heic
+```
 
 **La fonction ne croit rien de ce qu'on lui déclare** : ni le type MIME annoncé,
 ni le nom du fichier, ni les dimensions. Un `.jpg` qui contient un SVG est
