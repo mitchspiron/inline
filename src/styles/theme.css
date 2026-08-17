@@ -1,0 +1,50 @@
+/**
+ * Le thème du site : palette, échelle typographique, rythme.
+ *
+ * C'est le seul fichier à reprendre pour habiller un nouveau site. Les tokens
+ * de style du schéma Zod (tokens.css) ne connaissent que ces variables : ils ne
+ * contiennent aucune valeur en dur, donc changer de charte ne demande jamais de
+ * toucher au contenu ni au modèle.
+ */
+
+:root {
+  /* Palette — un nom de token du schéma, une variable */
+  --color-primary: #101828;
+  --color-secondary: #344054;
+  --color-muted: #667085;
+  --color-accent: #0b5cff;
+  --color-inverse: #ffffff;
+
+  --color-surface: #ffffff;
+  --color-surface-alt: #f7f8fa;
+  --color-border: #e4e7ec;
+
+  /* Échelle typographique — un cran par valeur de l'enum « size » */
+  --size-xs: 0.75rem;
+  --size-sm: 0.875rem;
+  --size-base: 1rem;
+  --size-lg: 1.25rem;
+  --size-xl: 1.5rem;
+  --size-2xl: 2rem;
+  --size-3xl: 2.75rem;
+
+  /* Graisses — un cran par valeur de l'enum « weight » */
+  --weight-thin: 100;
+  --weight-light: 300;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --line-height: 1.5;
+
+  --space-1: 0.5rem;
+  --space-2: 1rem;
+  --space-3: 1.5rem;
+  --space-4: 2rem;
+  --space-6: 3rem;
+  --space-8: 4rem;
+
+  --measure: 48rem;
+}

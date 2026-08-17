@@ -26,14 +26,17 @@ for (const file of ['.dev.vars', '.env']) {
   const path = join(root, file);
   if (!existsSync(path)) continue;
   for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
-    const match = line.match(/^\s*(GIT_TOKEN|CF_[A-Z_]*TOKEN|[A-Z_]*SECRET[A-Z_]*)\s*=\s*(.+)\s*$/);
+    const match = line.match(
+      /^\s*(GIT_TOKEN|EDITOR_KEY_HASH|CF_[A-Z_]*TOKEN|[A-Z_]*SECRET[A-Z_]*|[A-Z_]*KEY[A-Z_]*)\s*=\s*(.+)\s*$/,
+    );
     if (match && match[2].trim().length >= 8) {
       secretValues.push({ name: match[1], value: match[2].trim() });
     }
   }
 }
-if (process.env.GIT_TOKEN && process.env.GIT_TOKEN.length >= 8) {
-  secretValues.push({ name: 'GIT_TOKEN', value: process.env.GIT_TOKEN });
+for (const name of ['GIT_TOKEN', 'EDITOR_KEY_HASH', 'SESSION_SECRET']) {
+  const value = process.env[name];
+  if (value && value.length >= 8) secretValues.push({ name, value });
 }
 
 /** Formes reconnaissables, même sans valeur locale configurée. */
@@ -41,7 +44,11 @@ const patterns = [
   { label: 'jeton GitHub', regex: /\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\b/ },
   { label: 'jeton GitHub (fine-grained)', regex: /\bgithub_pat_[A-Za-z0-9_]{20,}\b/ },
   { label: 'jeton GitLab', regex: /\bglpat-[A-Za-z0-9_-]{15,}\b/ },
-  { label: 'nom de variable serveur', regex: /GIT_TOKEN|EDITOR_AUTHOR_EMAIL|GIT_API_BASE/ },
+  { label: 'empreinte de clé', regex: /\$argon2(id|i|d)\$/ },
+  {
+    label: 'nom de variable serveur',
+    regex: /GIT_TOKEN|GIT_API_BASE|EDITOR_KEY_HASH|SESSION_SECRET/,
+  },
   { label: 'en-tête d\'autorisation', regex: /authorization["'\s:]+bearer/i },
 ];
 

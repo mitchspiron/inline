@@ -16,6 +16,8 @@ export type PublishResult =
   | { status: 'published'; version: string }
   /** Le fichier a changé côté dépôt depuis l'ouverture de la page. */
   | { status: 'conflict' }
+  /** La session de 8 h est terminée. */
+  | { status: 'expired' }
   /** Contenu refusé par la validation serveur. */
   | { status: 'rejected' }
   /** Réseau, service indisponible, cause inconnue. */
@@ -64,6 +66,7 @@ export async function publish(payload: {
   const detail = await response.text().catch(() => '');
   console.warn('[editor] publication refusée', response.status, detail);
 
+  if (response.status === 401) return { status: 'expired' };
   if (response.status === 409) return { status: 'conflict' };
   if (response.status === 400 || response.status === 422) return { status: 'rejected' };
   return { status: 'failed' };

@@ -247,6 +247,15 @@ function start(context: Context): void {
       return;
     }
 
+    if (result.status === 'expired') {
+      ui.showBanner({
+        text: 'Votre session a pris fin. Reconnectez-vous pour publier : vos modifications sont conservées.',
+        tone: 'error',
+        actions: [{ label: 'Se reconnecter', onClick: () => (window.location.href = '/admin') }],
+      });
+      return;
+    }
+
     if (result.status === 'conflict') {
       ui.showBanner({
         text: "Cette page a été modifiée ailleurs depuis que vous l'avez ouverte. Rechargez-la pour repartir de la dernière version : vos modifications sont conservées.",

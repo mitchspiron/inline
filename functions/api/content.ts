@@ -16,7 +16,7 @@ export function onRequest(): Response {
 
 export async function onRequestGet({ request, env }: FunctionContext): Promise<Response> {
   if (!(await verifyAuth(request, env))) {
-    return json({ error: 'not_found' }, 404);
+    return json({ error: 'unauthorized' }, 401);
   }
 
   const path = new URL(request.url).searchParams.get('path');

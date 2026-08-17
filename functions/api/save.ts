@@ -47,7 +47,7 @@ export function onRequest(): Response {
 
 export async function onRequestPost({ request, env }: FunctionContext): Promise<Response> {
   if (!(await verifyAuth(request, env))) {
-    return json({ error: 'not_found' }, 404);
+    return json({ error: 'unauthorized' }, 401);
   }
 
   let payload: Partial<SavePayload>;

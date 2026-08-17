@@ -30,13 +30,13 @@ function check(label, ok, detail = '') {
 }
 
 if (!existsSync(HTML)) {
-  console.error('  ✗ dist/index.html absent — lancer « npm run build:editor » d\'abord.');
+  console.error('  ✗ dist/index.html absent — lancer « npm run build » d\'abord.');
   process.exit(1);
 }
 
 const html = await readFile(HTML, 'utf8');
 if (!html.includes('data-cms-file')) {
-  console.error('  ✗ le build en cours n\'est pas en mode édition — lancer « npm run build:editor ».');
+  console.error('  ✗ dist/index.html ne porte pas les points d\'ancrage — relancer « npm run build ».');
   process.exit(1);
 }
 

@@ -5,19 +5,20 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
+    "build": "astro build && npm run bundle:editor",
+    "bundle:editor": "esbuild src/editor/index.ts --bundle --minify --format=esm --target=es2020 --outfile=dist/editor/overlay.js",
     "preview": "astro preview",
     "check": "node scripts/check-html.mjs && node scripts/check-secrets.mjs",
-    "editor": "cross-env PUBLIC_EDITOR=true astro dev",
-    "build:editor": "cross-env PUBLIC_EDITOR=true astro build && npm run bundle:editor",
-    "bundle:editor": "esbuild src/editor/index.ts --bundle --minify --format=esm --target=es2020 --outfile=dist/editor/overlay.js",
-    "serve:functions": "wrangler pages dev",
+    "test": "npm run test:git && npm run test:auth && npm run build && npm run test:editor",
     "test:git": "node scripts/test-git-provider.mjs",
-    "mock:git": "node scripts/mock-git-api.mjs",
+    "test:auth": "node scripts/test-auth.mjs",
     "test:editor": "node scripts/test-editor.mjs",
-    "test": "npm run test:git && npm run build:editor && npm run test:editor"
+    "serve:functions": "wrangler pages dev",
+    "mock:git": "node scripts/mock-git-api.mjs",
+    "make:key": "node scripts/make-key.mjs"
   },
   "dependencies": {
+    "@noble/hashes": "^2.3.0",
     "astro": "^5.2.5",
     "zod": "^3.24.1"
   },

@@ -9,12 +9,17 @@ export interface FunctionContext {
   env: Record<string, unknown>;
 }
 
-export function json(data: unknown, status = 200): Response {
+export function json(
+  data: unknown,
+  status = 200,
+  headers: Record<string, string> = {},
+): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
+      ...headers,
     },
   });
 }
@@ -32,14 +37,10 @@ export function isAllowedPath(path: unknown): path is string {
 /** Plafond de taille du contenu accepté (~100 Ko de JSON). */
 export const MAX_CONTENT_BYTES = 100_000;
 
-/**
- * Attribution du commit. Un site, un auteur.
- *
- * TODO lot 1 — renommer en EDITOR_NAME / EDITOR_EMAIL, conformément au plan.
- */
+/** Attribution du commit. Un site, un auteur. */
 export function resolveAuthor(env: Record<string, unknown>): GitAuthor {
   return {
-    name: String(env.EDITOR_AUTHOR_NAME ?? 'Éditeur du site'),
-    email: String(env.EDITOR_AUTHOR_EMAIL ?? 'editeur@exemple.invalid'),
+    name: String(env.EDITOR_NAME ?? 'Éditeur du site'),
+    email: String(env.EDITOR_EMAIL ?? 'editeur@exemple.invalid'),
   };
 }

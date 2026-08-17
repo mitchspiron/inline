@@ -1,23 +1,24 @@
 ---
 import '../styles/tokens.css';
+import { site } from '../content/site';
 
 interface Props {
   title: string;
   description: string;
-  /** Fichier de contenu source, transmis à l'overlay en mode édition uniquement. */
+  /** Fichier de contenu source — point d'ancrage de l'overlay, inerte sinon. */
   contentFile: string;
   locale: string;
   pageName: string;
 }
 
 const { title, description, contentFile, locale, pageName } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
 
 /**
- * Le mode édition est décidé au build par une variable d'environnement.
- * Dans un build normal, l'overlay n'existe nulle part : ni script, ni attribut.
+ * En développement, l'overlay est servi par Vite depuis les sources ;
+ * en production, c'est le paquet compilé par esbuild.
  */
-const editorEnabled = import.meta.env.PUBLIC_EDITOR === 'true';
-const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const overlaySrc = import.meta.env.DEV ? '/src/editor/index.ts' : '/editor/overlay.js';
 ---
 
 <!doctype html>
@@ -32,22 +33,28 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
   </head>
-  <body
-    data-cms-file={editorEnabled ? contentFile : undefined}
-    data-cms-locale={editorEnabled ? locale : undefined}
-    data-cms-page={editorEnabled ? pageName : undefined}
-  >
+  <body data-cms-file={contentFile} data-cms-locale={locale} data-cms-page={pageName}>
+    <nav class="site-nav">
+      {site.navigation.map((item) => <a href={item.href}>{item.label}</a>)}
+    </nav>
+
     <slot />
 
-    {
-      /* `is:inline` : Astro ne touche pas à ce script. L'overlay reste donc
-         totalement hors du graphe de build normal — rien à désactiver ensuite. */
-      editorEnabled &&
-        (import.meta.env.DEV ? (
-          <script type="module" src="/src/editor/index.ts" is:inline />
-        ) : (
-          <script type="module" src="/editor/overlay.js" is:inline />
-        ))
-    }
+    <footer class="site-footer">
+      <p>{site.contact.email}{site.contact.phone ? ` — ${site.contact.phone}` : ''}</p>
+      {site.contact.address && <p>{site.contact.address}</p>}
+      <p>{site.footer.legal}</p>
+    </footer>
+
+    {/*
+      Amorce d'édition. Un visiteur ordinaire n'exécute qu'une lecture de cookie
+      et ne télécharge rien : le contenu de la page ne dépend d'aucun JavaScript.
+      Le témoin ne porte aucun secret et ne donne aucun droit — toutes les
+      écritures restent soumises au cookie de session, vérifié côté serveur.
+    */}
+    <script
+      is:inline
+      set:html={`document.cookie.includes("inline_edit=1")&&document.head.appendChild(Object.assign(document.createElement("script"),{type:"module",src:"${overlaySrc}"}))`}
+    />
   </body>
 </html>

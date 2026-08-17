@@ -81,7 +81,8 @@ const server = createServer(async (request, response) => {
     }
 
     await writeFile(file, content, 'utf8');
-    console.log(`  écrit  ${match[1]}  « ${body.message} »  (${body.committer?.email})`);
+    const author = `${body.committer?.name} <${body.committer?.email}>`;
+    console.log(`  écrit  ${match[1]}  « ${body.message} »  ${author}`);
     return send(response, 200, { content: { sha: blobId(content) } });
   }
 

@@ -1,0 +1,16 @@
+{
+  "name": "Agence",
+  "locale": "fr",
+  "navigation": [
+    { "label": "Accueil", "href": "/" },
+    { "label": "Nous contacter", "href": "mailto:bonjour@exemple.fr" }
+  ],
+  "contact": {
+    "email": "bonjour@exemple.fr",
+    "phone": "01 23 45 67 89",
+    "address": "12 rue de l'Exemple, 75000 Paris"
+  },
+  "footer": {
+    "legal": "© Agence — Tous droits réservés"
+  }
+}
