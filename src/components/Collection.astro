@@ -1,0 +1,56 @@
+---
+import type { CollectionItem, Page } from '../content/schema';
+
+interface Props {
+  data: Page;
+  /** Nom de la liste dans `collections`, ex. « testimonials ». */
+  name: string;
+  /** Composant de rendu d'un item. */
+  item: any;
+  /**
+   * Item vierge, cloné à l'ajout. Il est rendu par le MÊME composant que les
+   * items existants, et son JSON accompagne le modèle : l'overlay peut donc
+   * créer un item valide sans réimplémenter de moteur de rendu.
+   */
+  blank: Omit<CollectionItem, 'id'>;
+  class?: string;
+}
+
+const { data, name, item: Item, blank, class: extraClass = '' } = Astro.props;
+
+const path = `collections.${name}`;
+const items = (data.collections?.[name] ?? []) as CollectionItem[];
+
+/** Marqueur remplacé par l'identifiant réel au moment du clonage. */
+const PLACEHOLDER = '__id__';
+
+// Un identifiant réattribué casse le lien DOM/JSON et fait perdre les
+// modifications de l'item. Mieux vaut échouer au build que le découvrir après.
+const seen = new Set<string>();
+for (const entry of items) {
+  if (seen.has(entry.id)) {
+    throw new Error(`[Collection] Identifiant en double dans « ${name} » : ${entry.id}`);
+  }
+  seen.add(entry.id);
+}
+---
+
+<div data-cms-list={path} class={extraClass}>
+  {
+    items.map((entry) => (
+      <article data-cms-item={entry.id}>
+        <Item item={entry} path={`${path}.${entry.id}`} />
+      </article>
+    ))
+  }
+</div>
+
+{/*
+  Le modèle d'item. Son contenu n'est ni affiché ni indexé : un <template> est
+  inerte. Sans lui, ajouter un item obligerait à réécrire le rendu côté client.
+*/}
+<template data-cms-template={name} data-cms-blank={JSON.stringify(blank)}>
+  <article data-cms-item={PLACEHOLDER}>
+    <Item item={{ id: PLACEHOLDER, ...blank } as CollectionItem} path={`${path}.${PLACEHOLDER}`} />
+  </article>
+</template>

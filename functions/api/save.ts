@@ -84,6 +84,29 @@ function mediaIsValid(node: unknown): boolean {
   return Object.values(record).every(mediaIsValid);
 }
 
+/**
+ * Les identifiants d'items sont uniques dans leur liste.
+ *
+ * Le schéma valide leur forme, pas leur unicité. Deux items partageant un
+ * identifiant casseraient la réconciliation DOM/JSON : l'éditeur écrirait dans
+ * l'un et afficherait l'autre.
+ */
+function collectionIdsAreUnique(parsed: unknown): boolean {
+  const collections = (parsed as { collections?: Record<string, unknown> })?.collections;
+  if (!collections || typeof collections !== 'object') return true;
+
+  for (const items of Object.values(collections)) {
+    if (!Array.isArray(items)) return false;
+    const seen = new Set<string>();
+    for (const item of items) {
+      const id = (item as { id?: unknown })?.id;
+      if (typeof id !== 'string' || seen.has(id)) return false;
+      seen.add(id);
+    }
+  }
+  return true;
+}
+
 /** Constructions qui ne sont jamais du contenu, quelle qu'en soit l'origine. */
 const ATTACK = /<\s*(script|iframe|object|embed|form|svg|math)\b|\son[a-z]+\s*=|javascript\s*:|data\s*:\s*text\/html/i;
 
@@ -151,6 +174,11 @@ export async function onRequestPost({ request, env }: FunctionContext): Promise<
 
   if (!mediaIsValid(parsed)) {
     console.error('[save] contenu refusé : référence de média invalide');
+    return json({ error: 'invalid_content' }, 422);
+  }
+
+  if (!collectionIdsAreUnique(parsed)) {
+    console.error("[save] contenu refusé : identifiants d'items en double");
     return json({ error: 'invalid_content' }, 422);
   }
 

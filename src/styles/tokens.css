@@ -129,3 +129,28 @@ body {
   color: var(--color-muted);
   font-size: var(--size-sm);
 }
+
+.testimonials {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+.testimonials article {
+  padding: var(--space-3);
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-surface-muted, #f7f8fa);
+  border-radius: 0 8px 8px 0;
+}
+
+.testimonials blockquote {
+  margin: 0;
+}
+
+.testimonial-quote {
+  margin: 0 0 var(--space-1);
+}
+
+.testimonial-author {
+  margin: 0;
+}

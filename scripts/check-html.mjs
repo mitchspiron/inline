@@ -45,8 +45,19 @@ function collectTextFields(node, path = [], out = {}) {
     out[path.join('.')] = { kind: node.kind, field: node };
     return out;
   }
+  // Les items de collection sont indexés par leur identifiant, pas par leur
+  // position : c'est lui qui relie le DOM au JSON.
+  if (Array.isArray(node)) {
+    for (const entry of node) {
+      if (entry && typeof entry === 'object' && typeof entry.id === 'string') {
+        collectTextFields(entry, [...path, entry.id], out);
+      }
+    }
+    return out;
+  }
   if (node && typeof node === 'object') {
     for (const [key, child] of Object.entries(node)) {
+      if (key === 'id') continue;
       collectTextFields(child, [...path, key], out);
     }
   }
@@ -66,6 +77,13 @@ for (const page of PAGES) {
   const rawHtml = readFileSync(htmlPath, 'utf8');
   const haystack = decode(rawHtml);
   const fields = collectTextFields(data);
+
+  /**
+   * Le contenu d'un `<template>` est un modèle d'item, pas du contenu : il
+   * pointe vers un identifiant fictif et n'est ni affiché ni indexé. On le
+   * retire avant de chercher des `data-cms` orphelins.
+   */
+  const rendered = rawHtml.replace(/<template[\s\S]*?<\/template>/g, '');
 
   // 1. Tout le contenu est dans le HTML servi.
   for (const [path, entry] of Object.entries(fields)) {
@@ -104,10 +122,25 @@ for (const page of PAGES) {
     }
   }
 
-  // 2. Aucun data-cms orphelin.
-  for (const match of rawHtml.matchAll(/data-cms="([^"]+)"/g)) {
+  // 2. Aucun data-cms orphelin, hors modèles d'item.
+  for (const match of rendered.matchAll(/data-cms="([^"]+)"/g)) {
     if (!(match[1] in fields)) {
       errors.push(`${page.html} : data-cms="${match[1]}" ne correspond à aucun champ du contenu.`);
+    }
+  }
+
+  // 2 bis. Chaque collection a son modèle, et chaque item est dans la page.
+  for (const [name, items] of Object.entries(data.collections ?? {})) {
+    if (!rawHtml.includes(`data-cms-template="${name}"`)) {
+      errors.push(
+        `${page.html} : la collection « ${name} » n'a pas de <template> — ` +
+          "l'ajout d'item serait impossible.",
+      );
+    }
+    for (const item of items) {
+      if (!rendered.includes(`data-cms-item="${item.id}"`)) {
+        errors.push(`${page.html} : l'item « ${item.id} » de « ${name} » n'est pas rendu.`);
+      }
     }
   }
 

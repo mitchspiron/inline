@@ -69,5 +69,57 @@
         "title": "Présentation de notre méthode"
       }
     }
+  },
+  "collections": {
+    "testimonials": [
+      {
+        "id": "t-001",
+        "quote": {
+          "type": "text",
+          "value": "Un travail remarquable, livré dans les temps.",
+          "style": {
+            "size": "lg",
+            "weight": "regular",
+            "italic": true,
+            "align": "left",
+            "color": "primary"
+          }
+        },
+        "author": {
+          "type": "text",
+          "value": "Marie D., directrice",
+          "style": {
+            "size": "sm",
+            "weight": "medium",
+            "align": "left",
+            "color": "muted"
+          }
+        }
+      },
+      {
+        "id": "t-002",
+        "quote": {
+          "type": "text",
+          "value": "Nous modifions nos textes nous-mêmes, sans jamais rappeler personne.",
+          "style": {
+            "size": "lg",
+            "weight": "regular",
+            "italic": true,
+            "align": "left",
+            "color": "primary"
+          }
+        },
+        "author": {
+          "type": "text",
+          "value": "Karim B., gérant",
+          "style": {
+            "size": "sm",
+            "weight": "medium",
+            "align": "left",
+            "color": "muted"
+          }
+        }
+      }
+    ]
   }
 }

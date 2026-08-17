@@ -20,6 +20,15 @@ export interface FieldEdit {
    * fermeture de l'onglet et n'aurait plus de sens à la réouverture.
    */
   media?: Record<string, string | number>;
+  /**
+   * Composition d'une liste : l'ordre des identifiants après manipulation, et
+   * les items créés pendant la session, qui n'existent pas encore dans le
+   * dépôt.
+   *
+   * On ne stocke pas « ce qui a été supprimé » : un identifiant absent de
+   * `order` est retiré, et c'est tout ce qu'il y a à savoir.
+   */
+  list?: { order: string[]; added: Record<string, unknown> };
 }
 
 export interface Draft {

@@ -1,0 +1,23 @@
+---
+import type { CollectionItem } from '../content/schema';
+import Editable from './Editable.astro';
+
+interface Props {
+  item: CollectionItem;
+  /** Chemin de l'item, ex. « collections.testimonials.t-001 ». */
+  path: string;
+}
+
+const { item, path } = Astro.props;
+---
+
+{/*
+  Ce composant est rendu deux fois : une fois par item existant, une fois à
+  vide dans le <template> de la collection. C'est ce qui garantit qu'un item
+  ajouté depuis l'overlay a exactement la même structure qu'un item construit
+  — il n'y a pas de second rendu à tenir d'accord.
+*/}
+<blockquote>
+  <Editable path={`${path}.quote`} field={item.quote as any} as="p" class="testimonial-quote" />
+  <Editable path={`${path}.author`} field={item.author as any} as="footer" class="testimonial-author" />
+</blockquote>

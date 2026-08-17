@@ -34,13 +34,18 @@ function resolveField(source: unknown, keyPath: string): ImageField | VideoField
  * largeurs, dimensions calculées. Un fichier de `public/` serait servi tel
  * quel, sans aucune de ces garanties.
  */
-const library = import.meta.glob<{ default: ImageMetadata }>('/src/media/**/*.{png,jpg,jpeg,webp,avif}', {
-  eager: true,
-});
+// Le motif est relatif à ce fichier, et non absolu : un motif absolu est
+// résolu depuis la racine du projet, dont l'écriture varie selon la façon dont
+// le build est lancé — sous Windows, la casse de la lettre de lecteur suffit à
+// le faire échouer.
+const library = import.meta.glob<{ default: ImageMetadata }>(
+  '../media/**/*.{png,jpg,jpeg,webp,avif}',
+  { eager: true },
+);
 
 function resolveImage(src: string): ImageMetadata {
-  const key = `/src/media/${src.replace(/^\/+/, '').replace(/^src\/media\//, '')}`;
-  const entry = library[key];
+  const name = src.replace(/^\/+/, '').replace(/^src\/media\//, '');
+  const entry = library[`../media/${name}`];
   if (!entry) {
     throw new Error(
       `[Media] Le fichier « ${src} » est absent de src/media. ` +

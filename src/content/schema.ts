@@ -71,6 +71,26 @@ export const mediaSchema = z.discriminatedUnion('kind', [imageSchema, videoSchem
 /** Les trois types de champs, et pas un de plus. */
 export const fieldSchema = z.union([textSchema, richtextSchema, mediaSchema]);
 
+/**
+ * Un item de collection : un identifiant, puis des champs comme ailleurs.
+ *
+ * L'identifiant est **stable et immuable**. C'est la clé de réconciliation
+ * entre le DOM et le JSON : le réattribuer ferait perdre les modifications de
+ * l'item. Le format est contraint pour qu'aucun identifiant fabriqué ne puisse
+ * servir à autre chose qu'à désigner un item.
+ */
+export const collectionItemSchema = z
+  .object({ id: z.string().regex(/^[a-z]-\d{3,}$/, 'identifiant d\'item invalide') })
+  .catchall(fieldSchema);
+
+/**
+ * Les collections, par nom de liste.
+ *
+ * Le tableau peut être vide : une page dont le client a retiré tous les
+ * témoignages reste une page valide.
+ */
+export const collectionsSchema = z.record(z.array(collectionItemSchema));
+
 export const pageSchema = z.object({
   meta: z.object({
     title: z.string().max(60),
@@ -78,6 +98,7 @@ export const pageSchema = z.object({
     ogImage: z.string().optional(),
   }),
   blocks: z.record(z.record(fieldSchema)),
+  collections: collectionsSchema.optional(),
 });
 
 /**
@@ -113,5 +134,6 @@ export type ImageField = z.infer<typeof imageSchema>;
 export type VideoField = z.infer<typeof videoSchema>;
 export type MediaField = z.infer<typeof mediaSchema>;
 export type Field = z.infer<typeof fieldSchema>;
+export type CollectionItem = z.infer<typeof collectionItemSchema>;
 export type Page = z.infer<typeof pageSchema>;
 export type Site = z.infer<typeof siteSchema>;

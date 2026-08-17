@@ -328,6 +328,173 @@ const dangerous = rich.commands.filter((c) => c.name === 'insertHTML').pop();
 check('un script collé est retiré côté navigateur', !/<script|onerror/i.test(dangerous?.value ?? ''), dangerous?.value);
 check('le texte autour du script est conservé', dangerous?.value === 'avantaprès', dangerous?.value);
 
+
+// --- Listes -------------------------------------------------------------------
+console.log('\nListes');
+
+const listPage = await openPage();
+const listDoc = listPage.document;
+
+function items(document) {
+  return [...document.querySelectorAll('[data-cms-list] > [data-cms-item]')];
+}
+function ids(document) {
+  return items(document).map((element) => element.dataset.cmsItem);
+}
+
+/** Structure d'un item, indépendamment de son identifiant et de ses textes. */
+function shape(element) {
+  const walk = (node) =>
+    [...node.children].map((child) => ({
+      tag: child.tagName,
+      classes: [...child.classList].sort().join(' '),
+      field: (child.dataset.cms ?? '').split('.').pop() ?? '',
+      type: child.dataset.cmsType ?? '',
+      children: walk(child),
+    }));
+  return JSON.stringify(walk(element));
+}
+
+check('les deux items du contenu sont rendus', ids(listDoc).join(',') === 't-001,t-002', ids(listDoc).join(','));
+check('un bouton d\'ajout est posé', !!buttonByText(listDoc, 'Ajouter'));
+check('le modèle d\'item est dans la page', !!listDoc.querySelector('template[data-cms-template="testimonials"]'));
+
+const builtShape = shape(items(listDoc)[1]);
+
+// Ajouter
+buttonByText(listDoc, 'Ajouter').click();
+await new Promise((resolve) => setTimeout(resolve, 350));
+
+check('un item est ajouté à la fin', ids(listDoc).length === 3, ids(listDoc).join(','));
+const addedId = ids(listDoc)[2];
+check('son identifiant suit la série', addedId === 't-003', addedId);
+check(
+  'sa structure est identique à celle d\'un item construit',
+  shape(items(listDoc)[2]) === builtShape,
+  shape(items(listDoc)[2]),
+);
+check(
+  'ses champs pointent vers son propre identifiant',
+  [...items(listDoc)[2].querySelectorAll('[data-cms]')].every((f) =>
+    f.dataset.cms.startsWith('collections.testimonials.' + addedId + '.'),
+  ),
+);
+check(
+  'aucun champ ne garde le marqueur du modèle',
+  !listDoc.querySelector('[data-cms-list] [data-cms*="__id__"]'),
+);
+
+const draftAfterAdd = JSON.parse(listPage.storage.get('cms:draft:' + FILE));
+check(
+  'le brouillon retient la composition de la liste',
+  draftAfterAdd.fields['collections.testimonials'].list.order.join(',') === 't-001,t-002,t-003',
+  JSON.stringify(draftAfterAdd.fields['collections.testimonials']?.list?.order),
+);
+check(
+  'le nouvel item est décrit dans le brouillon',
+  !!draftAfterAdd.fields['collections.testimonials'].list.added[addedId],
+);
+
+// Le nouvel item est éditable tout de suite.
+const newQuote = items(listDoc)[2].querySelector('[data-cms$=".quote"]');
+newQuote.dispatchEvent(new listPage.window.MouseEvent('click', { bubbles: true }));
+check('un item ajouté est modifiable sans recharger', newQuote.getAttribute('contenteditable') === 'true');
+type(listPage.window, newQuote, 'Texte du nouvel item');
+await new Promise((resolve) => setTimeout(resolve, 350));
+
+// Dupliquer
+function itemTool(document, label) {
+  return [...document.querySelectorAll('.cms-ui-item-tools button')].find((b) => b.textContent === label);
+}
+function hover(page, element) {
+  element.dispatchEvent(new page.window.MouseEvent('mouseover', { bubbles: true }));
+}
+
+hover(listPage, items(listDoc)[0]);
+itemTool(listDoc, 'Dupliquer').dispatchEvent(
+  new listPage.window.MouseEvent('mousedown', { bubbles: true, cancelable: true }),
+);
+await new Promise((resolve) => setTimeout(resolve, 350));
+
+check('la copie est insérée juste après l\'original', ids(listDoc)[1] === 't-004', ids(listDoc).join(','));
+check('aucun identifiant n\'est réattribué', new Set(ids(listDoc)).size === ids(listDoc).length);
+check(
+  'la copie reprend le texte de l\'original',
+  items(listDoc)[1].querySelector('[data-cms$=".quote"]').textContent ===
+    items(listDoc)[0].querySelector('[data-cms$=".quote"]').textContent,
+);
+
+// Réordonner
+hover(listPage, items(listDoc)[0]);
+check('« Monter » est désactivé sur le premier item', itemTool(listDoc, 'Monter').disabled);
+itemTool(listDoc, 'Descendre').dispatchEvent(
+  new listPage.window.MouseEvent('mousedown', { bubbles: true, cancelable: true }),
+);
+await new Promise((resolve) => setTimeout(resolve, 350));
+check('l\'item descend d\'un rang', ids(listDoc)[0] === 't-004' && ids(listDoc)[1] === 't-001', ids(listDoc).join(','));
+
+// Supprimer : refus puis acceptation
+listPage.window.confirm = () => false;
+hover(listPage, items(listDoc)[0]);
+itemTool(listDoc, 'Supprimer').dispatchEvent(
+  new listPage.window.MouseEvent('mousedown', { bubbles: true, cancelable: true }),
+);
+await new Promise((resolve) => setTimeout(resolve, 100));
+check('refuser la confirmation ne supprime rien', ids(listDoc).length === 4, ids(listDoc).join(','));
+
+let confirmMessage = '';
+listPage.window.confirm = (message) => {
+  confirmMessage = message;
+  return true;
+};
+hover(listPage, items(listDoc)[0]);
+itemTool(listDoc, 'Supprimer').dispatchEvent(
+  new listPage.window.MouseEvent('mousedown', { bubbles: true, cancelable: true }),
+);
+await new Promise((resolve) => setTimeout(resolve, 350));
+check('confirmer supprime l\'item', ids(listDoc).length === 3, ids(listDoc).join(','));
+check(
+  'le message de confirmation rassure et ne parle pas technique',
+  /conserv/i.test(confirmMessage) && !/(commit|git|json|sha)/i.test(confirmMessage),
+  confirmMessage,
+);
+
+// Publication
+buttonByText(listDoc, 'Publier').click();
+await new Promise((resolve) => setTimeout(resolve, 100));
+
+const listSave = listPage.calls.filter((c) => c.url === '/api/save').pop();
+const listSent = JSON.parse(JSON.parse(listSave.init.body).content);
+const published = listSent.collections.testimonials;
+
+check('la liste publiée a le bon nombre d\'items', published.length === 3, String(published.length));
+check(
+  'l\'ordre publié est celui de la page',
+  published.map((i) => i.id).join(',') === ids(listDoc).join(','),
+  published.map((i) => i.id).join(','),
+);
+check('chaque item publié porte son identifiant', published.every((i) => /^t-\d{3}$/.test(i.id)));
+check('aucun identifiant en double', new Set(published.map((i) => i.id)).size === published.length);
+check(
+  'le texte saisi dans l\'item ajouté est publié',
+  published.find((i) => i.id === addedId)?.quote.value === 'Texte du nouvel item',
+  JSON.stringify(published.find((i) => i.id === addedId)?.quote?.value),
+);
+check(
+  'les items publiés gardent la forme du schéma',
+  published.every((i) => i.quote?.type === 'text' && i.author?.type === 'text' && i.quote.style?.size),
+);
+
+// Annuler
+const resetPage = await openPage();
+const resetDoc = resetPage.document;
+buttonByText(resetDoc, 'Ajouter').click();
+await new Promise((resolve) => setTimeout(resolve, 350));
+check('un item est bien ajouté avant l\'annulation', ids(resetDoc).length === 3);
+buttonByText(resetDoc, 'Annuler mes modifications').click();
+await new Promise((resolve) => setTimeout(resolve, 100));
+check('annuler rend à la liste sa composition d\'origine', ids(resetDoc).join(',') === 't-001,t-002', ids(resetDoc).join(','));
+
 if (failures > 0) {
   console.error(`\n${failures} contrôle(s) en échec.\n`);
   process.exit(1);

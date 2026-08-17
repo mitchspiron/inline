@@ -9,8 +9,8 @@ Le client reçoit une URL, `monsite.fr/admin`, et une clé. Il entre, il modifie
 ses textes sur ses propres pages, il publie. Chaque publication est un commit ;
 le site se reconstruit dans la minute.
 
-**État : lots 0 à 3 livrés.** Une page, une langue : textes, richtext, images et
-vidéos. Listes et multilingue arrivent avec leurs lots — voir *Ce qui n'est pas
+**État : lots 0 à 4 livrés.** Une page, une langue : textes, richtext, images,
+vidéos et listes. Le multilingue arrive avec son lot — voir *Ce qui n'est pas
 encore là*.
 
 ---
@@ -274,6 +274,39 @@ convertir quoi que ce soit.
 formes fonctionnent : la barre d'adresse, le bouton « Partager », le code
 d'intégration collé en entier. Aucun fichier vidéo n'est jamais téléversé.
 
+**Sur une liste**, un bouton « Ajouter » sous la liste, et au survol d'un
+élément : Monter, Descendre, Dupliquer, Supprimer. Toute suppression demande
+confirmation, avec la mention que les versions précédentes sont conservées.
+
+### Ajouter une liste éditable
+
+```astro
+<Collection
+  data={data}
+  name="testimonials"
+  item={Testimonial}
+  blank={{ quote: { … }, author: { … } }}
+/>
+```
+
+`Collection` rend les items **et** le `<template>` qui sert de modèle, avec le
+même composant d'item. C'est ce qui garantit qu'un élément ajouté depuis la
+page a exactement la structure d'un élément construit : il n'y a pas de second
+rendu à tenir d'accord, et aucun moteur de rendu côté client.
+
+Le `blank` accompagne le modèle dans la page. Sans lui, l'overlay ne saurait
+pas quel JSON créer à l'ajout.
+
+`npm run check` échoue si une collection n'a pas son `<template>` — sans lui,
+le bouton « Ajouter » ne pourrait rien faire.
+
+### Les identifiants d'items
+
+Chaque élément porte un identifiant (`t-001`, `t-002`…) **stable et immuable** :
+c'est la clé qui relie le DOM au JSON. Un identifiant n'est jamais réattribué,
+même après suppression — le réutiliser rattacherait les modifications d'un
+élément disparu à un élément neuf. La fonction refuse tout doublon.
+
 ### Où passe le traitement des images
 
 Trois étapes, chacune là où elle a les moyens de se faire :
@@ -370,7 +403,7 @@ Ce qui reste à faire : limitation de débit sur `/api/save` et `/api/upload`
 
 ## Ce qui n'est pas encore là
 
-Listes et collections (lot 4), multilingue (lot 5).
+Multilingue (lot 5).
 Les types correspondants existent déjà dans le schéma : le contenu qui les
 utilise sera validé, mais aucun composant ne les rend et aucun bouton ne les
 modifie.

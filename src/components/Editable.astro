@@ -3,16 +3,21 @@ import type { Page, RichtextField, TextField } from '../content/schema';
 import { styleClasses } from '../lib/style-tokens';
 
 interface Props {
-  /** Données de la page (page.data). */
-  data: Page;
+  /** Données de la page (page.data). Inutile si `field` est fourni. */
+  data?: Page;
   /** Chemin de la clé dans le JSON, ex. « blocks.hero.title ». */
   path: string;
+  /**
+   * Champ déjà résolu. Sert aux items de collection, dont le chemin contient
+   * un identifiant : c'est la boucle qui le connaît, pas ce composant.
+   */
+  field?: TextField | RichtextField;
   /** Balise de rendu. */
   as?: keyof HTMLElementTagNameMap;
   class?: string;
 }
 
-const { data, path, as: Tag = 'p', class: extraClass = '' } = Astro.props;
+const { data, path, field: given, as: Tag = 'p', class: extraClass = '' } = Astro.props;
 
 /**
  * Résout le chemin dans le JSON. Un `data-cms` qui pointe vers une clé absente
@@ -35,7 +40,10 @@ function resolveField(source: unknown, keyPath: string): TextField | RichtextFie
   return node as TextField | RichtextField;
 }
 
-const field = resolveField(data, path);
+if (!given && !data) {
+  throw new Error(`[Editable] « ${path} » : il faut fournir « data » ou « field ».`);
+}
+const field = given ?? resolveField(data, path);
 
 // Le richtext n'a pas d'objet `style` : sa mise en forme est dans son balisage.
 const classes = [

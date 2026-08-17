@@ -11,6 +11,16 @@ import { mountUi, type Ui } from './bar';
 import { clearDraft, formatSavedAt, readDraft, writeDraft, type FieldEdit } from './draft';
 import { loadContent, publish, uploadImage } from './api';
 import { createMediaPanel } from './media';
+import {
+  cloneItem,
+  cloneTemplate,
+  findLists,
+  itemElement,
+  itemsOf,
+  mountListControls,
+  nextId,
+  type ListZone,
+} from './collection';
 import { embedUrl } from '../lib/video';
 import { loadSanitizer, sanitizeRichtext, sanitizeText } from './sanitize';
 import { createToolbar, type RichCommand, type StyleChange } from './toolbar';
@@ -53,17 +63,29 @@ function readContext(): Context | null {
   return { file: cmsFile, locale: cmsLocale, page: cmsPage };
 }
 
-/** Renvoie le nœud parent et la clé finale d'un chemin, ou null. */
+/**
+ * Renvoie le nœud parent et la clé finale d'un chemin, ou null.
+ *
+ * Un segment qui tombe sur un tableau désigne un item par son identifiant, et
+ * non par sa position : c'est ce qui permet à un item de changer de rang sans
+ * que les modifications en cours ne se retrouvent sur son voisin.
+ */
 function resolve(source: any, path: string): { parent: any; key: string } | null {
   const keys = path.split('.');
   const key = keys.pop()!;
   let node = source;
+
   for (const step of keys) {
     if (node == null || typeof node !== 'object') return null;
-    node = node[step];
+    node = Array.isArray(node) ? node.find((entry) => entry?.id === step) : node[step];
   }
-  if (node == null || typeof node !== 'object' || !(key in node)) return null;
-  return { parent: node, key };
+
+  if (node == null || typeof node !== 'object') return null;
+  if (Array.isArray(node)) {
+    const index = node.findIndex((entry) => entry?.id === key);
+    return index === -1 ? null : { parent: node, key: String(index) };
+  }
+  return key in node ? { parent: node, key } : null;
 }
 
 /** Relit les tokens de style depuis les classes posées au build. */
@@ -228,7 +250,7 @@ function start(context: Context): void {
       }
       if (Object.keys(edit.media).length === 0) delete edit.media;
     }
-    if (edit.value === undefined && !edit.style && !edit.media) delete edits[path];
+    if (edit.value === undefined && !edit.style && !edit.media && !edit.list) delete edits[path];
   }
 
   function setValue(path: string, value: string): void {
@@ -282,7 +304,12 @@ function start(context: Context): void {
 
   // --- Édition ------------------------------------------------------------
 
-  for (const zone of zones.values()) {
+  /**
+   * Rend une zone modifiable. Appelée au chargement, et de nouveau sur les
+   * items ajoutés en cours de session — qui doivent être éditables tout de
+   * suite, sans rechargement.
+   */
+  function registerZone(zone: Zone): void {
     const { element, path, kind } = zone;
 
     if (kind === 'media') {
@@ -302,7 +329,7 @@ function start(context: Context): void {
           });
         }
       });
-      continue;
+      return;
     }
 
     element.addEventListener('click', (event) => {
@@ -384,6 +411,209 @@ function start(context: Context): void {
     });
   }
 
+  for (const zone of zones.values()) registerZone(zone);
+
+  /** Enregistre les champs d'un item qui vient d'apparaître dans la page. */
+  function registerItem(element: HTMLElement): void {
+    for (const field of element.querySelectorAll<HTMLElement>('[data-cms]')) {
+      const path = field.dataset.cms!;
+      if (zones.has(path)) continue;
+
+      const declared = field.dataset.cmsType;
+      const kind: FieldKind =
+        declared === 'richtext' ? 'richtext' : declared === 'media' ? 'media' : 'text';
+      const zone: Zone = {
+        path,
+        element: field,
+        kind,
+        mediaKind: kind === 'media' ? (field.dataset.cmsKind === 'video' ? 'video' : 'image') : undefined,
+      };
+
+      zones.set(path, zone);
+      baseValues[path] = kind === 'richtext' ? field.innerHTML : (field.textContent ?? '');
+      if (kind === 'text') baseStyles[path] = styleFromElement(field);
+      registerZone(zone);
+    }
+  }
+
+  // --- Listes ---------------------------------------------------------------
+
+  const lists = findLists();
+  /** Composition d'origine, telle que construite. */
+  const baseOrder: Record<string, string[]> = {};
+  /** Les nœuds d'origine, gardés pour pouvoir revenir en arrière. */
+  const baseNodes: Record<string, Map<string, HTMLElement>> = {};
+  /**
+   * Tous les identifiants ayant existé, y compris ceux d'items supprimés.
+   * Cet ensemble ne rétrécit jamais : c'est ce qui garantit qu'aucun
+   * identifiant n'est réattribué.
+   */
+  const usedIds: Record<string, Set<string>> = {};
+
+  for (const zone of lists) {
+    const items = itemsOf(zone);
+    const ids = items.map((element) => element.dataset.cmsItem!).filter(Boolean);
+    baseOrder[zone.path] = ids;
+    baseNodes[zone.path] = new Map(items.map((element) => [element.dataset.cmsItem!, element]));
+    usedIds[zone.path] = new Set(ids);
+  }
+
+  function currentOrder(path: string): string[] {
+    return [...(edits[path]?.list?.order ?? baseOrder[path] ?? [])];
+  }
+
+  function currentAdded(path: string): Record<string, unknown> {
+    return { ...(edits[path]?.list?.added ?? {}) };
+  }
+
+  function setList(path: string, order: string[], added: Record<string, unknown>): void {
+    const original = baseOrder[path] ?? [];
+    const unchanged =
+      order.length === original.length && order.every((id, index) => original[index] === id);
+
+    if (unchanged && Object.keys(added).length === 0) {
+      if (edits[path]) delete edits[path].list;
+    } else {
+      edits[path] = { ...edits[path], list: { order, added } };
+    }
+    prune(path);
+    markDirty();
+  }
+
+  /** L'item tel qu'il est à l'écran : sa version du dépôt, plus les retouches. */
+  function itemJson(zone: ListZone, id: string): Record<string, unknown> | null {
+    const added = edits[zone.path]?.list?.added?.[id];
+    let item: Record<string, unknown> | null = added
+      ? JSON.parse(JSON.stringify(added))
+      : null;
+
+    if (!item && source) {
+      const target = resolve(source, zone.path);
+      const list = target ? target.parent[target.key] : null;
+      const found = Array.isArray(list) ? list.find((entry: any) => entry?.id === id) : null;
+      if (found) item = JSON.parse(JSON.stringify(found));
+    }
+    if (!item) return null;
+
+    // Les modifications non publiées de cet item doivent suivre la copie.
+    for (const [path, edit] of Object.entries(edits)) {
+      const prefix = `${zone.path}.${id}.`;
+      if (!path.startsWith(prefix)) continue;
+      const field = item[path.slice(prefix.length)] as Record<string, unknown> | undefined;
+      if (!field) continue;
+      if (edit.value !== undefined) field.value = edit.value;
+      if (edit.style) field.style = { ...(field.style as object), ...edit.style };
+      if (edit.media) Object.assign(field, edit.media);
+    }
+
+    delete item.id;
+    return item;
+  }
+
+  const listControls = mountListControls(lists, {
+    onAdd(zone) {
+      if (!zone.template || !zone.blank) {
+        ui.showBanner({
+          text: "Cette liste ne peut pas recevoir de nouvel élément pour le moment.",
+          tone: 'error',
+          actions: [{ label: 'Fermer', onClick: () => ui.clearBanner() }],
+        });
+        return;
+      }
+
+      const id = nextId(usedIds[zone.path], zone.name);
+      usedIds[zone.path].add(id);
+
+      const element = cloneTemplate(zone, id);
+      if (!element) return;
+
+      zone.container.appendChild(element);
+      registerItem(element);
+
+      setList(zone.path, [...currentOrder(zone.path), id], {
+        ...currentAdded(zone.path),
+        [id]: JSON.parse(JSON.stringify(zone.blank)),
+      });
+      listControls.refresh();
+    },
+
+    onDuplicate(zone, id) {
+      const sourceElement = itemElement(zone, id);
+      const copyOf = itemJson(zone, id);
+      if (!sourceElement || !copyOf) {
+        ui.showBanner({
+          text: "Cet élément n'a pas pu être copié, réessayez.",
+          tone: 'error',
+          actions: [{ label: 'Fermer', onClick: () => ui.clearBanner() }],
+        });
+        return;
+      }
+
+      const newId = nextId(usedIds[zone.path], zone.name);
+      usedIds[zone.path].add(newId);
+
+      const element = cloneItem(sourceElement, id, newId, zone.path);
+      sourceElement.insertAdjacentElement('afterend', element);
+      registerItem(element);
+
+      const order = currentOrder(zone.path);
+      order.splice(order.indexOf(id) + 1, 0, newId);
+      setList(zone.path, order, { ...currentAdded(zone.path), [newId]: copyOf });
+      listControls.refresh();
+    },
+
+    onRemove(zone, id) {
+      // Confirmation obligatoire, et message rassurant : un client qui n'a pas
+      // peur de casser son site est un client qui s'en sert.
+      const confirmed = window.confirm(
+        'Retirer cet élément de la liste ?\n\n' +
+          'Il disparaîtra de la page à la prochaine publication. Vos versions ' +
+          'précédentes sont conservées : rien n’est perdu définitivement.',
+      );
+      if (!confirmed) return;
+
+      const element = itemElement(zone, id);
+      element?.remove();
+
+      const added = currentAdded(zone.path);
+      delete added[id];
+      setList(
+        zone.path,
+        currentOrder(zone.path).filter((entry) => entry !== id),
+        added,
+      );
+      listControls.hideTools();
+    },
+
+    onMove(zone, id, direction) {
+      const order = currentOrder(zone.path);
+      const index = order.indexOf(id);
+      const target = index + direction;
+      if (index === -1 || target < 0 || target >= order.length) return;
+
+      [order[index], order[target]] = [order[target], order[index]];
+
+      const element = itemElement(zone, id);
+      const neighbour = itemElement(zone, order[index]);
+      if (element && neighbour) {
+        if (direction === -1) neighbour.insertAdjacentElement('beforebegin', element);
+        else neighbour.insertAdjacentElement('afterend', element);
+      }
+
+      setList(zone.path, order, currentAdded(zone.path));
+      listControls.refresh();
+    },
+  });
+
+  /** Remet une liste dans sa composition d'origine. */
+  function restoreList(zone: ListZone): void {
+    for (const element of itemsOf(zone)) element.remove();
+    for (const id of baseOrder[zone.path] ?? []) {
+      const element = baseNodes[zone.path]?.get(id);
+      if (element) zone.container.appendChild(element);
+    }
+  }
+
   // --- Brouillon local ----------------------------------------------------
 
   function applyEditToDom(path: string, edit: FieldEdit): void {
@@ -440,6 +670,12 @@ function start(context: Context): void {
     );
     if (!confirmed) return;
 
+    // Les listes reprennent leur composition d'origine, avec les nœuds
+    // construits : les items ajoutés disparaissent, les retirés reviennent.
+    for (const listZone of lists) {
+      if (edits[listZone.path]?.list) restoreList(listZone);
+    }
+
     for (const path of Object.keys(edits)) {
       const zone = zones.get(path);
       if (!zone) continue;
@@ -455,6 +691,7 @@ function start(context: Context): void {
     clearDraft(context.file);
     toolbar.hide();
     mediaPanel.close();
+    listControls.hideTools();
     ui.clearBanner();
     ui.setDirty(false);
   }
@@ -537,12 +774,38 @@ function start(context: Context): void {
     ui.setBusy(true);
 
     const next = JSON.parse(JSON.stringify(source));
+
+    // Les listes d'abord : ajouts, retraits et ordre. Les modifications de
+    // champs qui suivent désignent des items par identifiant, et doivent donc
+    // trouver la liste dans sa composition finale.
+    for (const path of paths) {
+      const list = edits[path].list;
+      if (!list) continue;
+
+      const target = resolve(next, path);
+      if (!target) continue;
+
+      const before: any[] = Array.isArray(target.parent[target.key])
+        ? target.parent[target.key]
+        : [];
+      const byId = new Map(before.map((entry) => [entry.id, entry]));
+
+      target.parent[target.key] = list.order
+        .map((id) => {
+          const item = byId.get(id) ?? list.added[id];
+          return item ? JSON.parse(JSON.stringify({ ...(item as object), id })) : null;
+        })
+        .filter(Boolean);
+    }
+
     for (const path of paths) {
       const target = resolve(next, path);
       if (!target) continue;
       const field = target.parent[target.key];
       const edit = edits[path];
       const zone = zones.get(path);
+
+      if (edit.list) continue;
 
       if (edit.value !== undefined) {
         field.value =

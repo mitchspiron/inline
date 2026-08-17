@@ -87,6 +87,20 @@ export const OVERLAY_CSS = `
 .cms-ui-on [data-cms-type="media"] { cursor: pointer; }
 .cms-ui-on [data-cms-type="media"]:hover { outline-color: #b3c8ff; }
 
+.cms-ui-on [data-cms-item] { outline: 2px dashed transparent; outline-offset: 4px; transition: outline-color .12s; }
+.cms-ui-on [data-cms-item]:hover { outline-color: #d6e0f5; }
+
+.cms-ui-item-tools {
+  position: absolute; z-index: 2147483250;
+  display: flex; gap: 4px; padding: 5px 6px; border-radius: 8px;
+  background: #fff; border: 1px solid #d0d5dd;
+  box-shadow: 0 6px 18px rgba(16,24,40,.18);
+  font-size: 12px;
+}
+.cms-ui-item-tools[hidden] { display: none; }
+.cms-ui-add { margin-top: 10px; font-size: 13px; padding: 7px 14px; }
+.cms-ui-add:disabled { opacity: .45; cursor: default; }
+
 .cms-ui-blocker {
   position: fixed; inset: 0; z-index: 2147483600; display: none;
   align-items: center; justify-content: center; padding: 32px; text-align: center;
@@ -94,6 +108,7 @@ export const OVERLAY_CSS = `
 }
 @media (max-width: 767px) {
   .cms-ui-blocker { display: flex; }
-  .cms-ui-bar, .cms-ui-banner, .cms-ui-toolbar, .cms-ui-panel { display: none; }
+  .cms-ui-bar, .cms-ui-banner, .cms-ui-toolbar, .cms-ui-panel,
+  .cms-ui-item-tools, .cms-ui-add { display: none; }
 }
 `;
