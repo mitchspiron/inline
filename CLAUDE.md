@@ -16,11 +16,12 @@ Ces règles priment sur toute autre considération. En cas de doute, demander pl
 
 1. **`output: 'static'` — jamais SSR, jamais hybride.** Aucune proposition de rendu serveur ne doit être retenue.
 2. **Aucune directive `client:*` sur un composant affichant du contenu éditorial.** C'est la règle la plus facile à enfreindre par réflexe et la plus coûteuse : elle sort le contenu du HTML brut, donc de l'index des crawlers IA. Seules exceptions : l'overlay d'édition, et les interactions purement visuelles dont tous les éléments sont déjà dans le HTML (un carousel doit contenir tous ses slides en dur, le JS ne fait que les faire défiler).
-3. **Le token GitHub ne quitte jamais le serveur.** Il appartient à l'agence, pas au client. Aucun code ne doit le placer dans une réponse, un fichier servi, `localStorage` ou `sessionStorage`.
-4. **Aucun secret dans le dépôt.** Tokens et clés vivent exclusivement en variables d'environnement de la fonction Cloudflare.
+3. **Le token Git ne quitte jamais le serveur.** Il appartient à l'agence, pas au client. Aucun code ne doit le placer dans une réponse, un fichier servi, `localStorage` ou `sessionStorage`.
+3 bis. **La clé de site est vérifiée exclusivement côté serveur.** Ne jamais servir `EDITOR_KEY_HASH` au navigateur, ne jamais comparer la clé en JavaScript client. Un hash exposé est attaquable hors ligne.
+4. **Aucun secret dans le dépôt.** Tokens et clés vivent exclusivement en variables d'environnement de la fonction serveur — l'hébergeur n'est pas tranché, aucun code ne doit en dépendre.
 5. **Aucun style libre.** Les styles éditables passent uniquement par les enums Zod de `src/content/config.ts`. Pas d'hexadécimal, pas de pixels dans le JSON de contenu.
 6. **Ne pas utiliser `src/pages/api/*`.** En sortie statique, ces endpoints s'exécutent au build et non à la requête. Toute route dynamique va dans `/functions`.
-7. **Toute écriture est validée côté serveur** : identité Access, schéma Zod, chemin en liste blanche, taille, assainissement. Ne jamais se reposer sur la validation client.
+7. **Toute écriture est validée côté serveur** : identité, schéma Zod, chemin en liste blanche, taille, assainissement. Ne jamais se reposer sur la validation client.
 8. **Aucun jargon technique dans l'interface d'édition.** Le client est non technique et ne verra jamais le code. « Publier » et non « Commit », « Description de l'image » et non « alt », « Annuler mes modifications » et non « Revert ». Le mot Git, le SHA, le JSON et le nom du dépôt ne doivent apparaître nulle part à l'écran.
 9. **Aucune arborescence de contenu dans l'overlay.** Pas de panneau latéral affichant l'arbre du JSON ni de liste de fichiers. L'édition se fait sur la page, uniquement sur la page. C'est ce qui distingue cet outil d'un CMS.
 10. **Les vidéos ne sont jamais téléversées.** Le schéma n'accepte qu'un `provider` + `videoId` (YouTube/Vimeo). Ne pas ajouter d'upload vidéo : un fichier lourd dans Git casse le dépôt et les builds.
@@ -43,7 +44,10 @@ Ces règles priment sur toute autre considération. En cas de doute, demander pl
   /pages/[lang]/[...slug].astro
 /public/media
 /functions
-  /api/save.ts            Écriture : Access + Zod + commit GitHub
+  /lib/auth.ts            verifyAuth / createSession
+  /lib/git-provider.ts    Abstraction GitHub / GitLab
+  /api/auth.ts            Vérification de la clé de site → cookie signé
+  /api/save.ts            Écriture : verifyAuth + Zod + commit
   /api/upload.ts          Upload de médias
 /scripts
   check-html.mjs          CI : vérifie que le contenu est dans le HTML brut
@@ -52,7 +56,14 @@ Ces règles priment sur toute autre considération. En cas de doute, demander pl
 
 **Flux de lecture** : JSON → Astro → HTML statique sur CDN. Aucun appel réseau à l'exécution.
 
-**Flux d'écriture** : overlay → `POST /api/save` → Access → Zod → commit GitHub → webhook → rebuild. Publication en 30 à 60 s.
+**Flux d'écriture** : overlay → `POST /api/save` → `verifyAuth` (cookie de session) → Zod → commit via `git-provider` → webhook → rebuild. Publication en 30 à 60 s.
+
+**Deux points de couplage isolés**, et deux seulement :
+```
+functions/lib/git-provider.ts   readFile / writeFile        (GitHub | GitLab)
+functions/lib/auth.ts           verifyAuth / createSession  (clé de site | délégué)
+```
+Aucune vérification d'identité ni appel à une API Git ailleurs dans le code.
 
 ---
 
@@ -113,18 +124,30 @@ wrangler pages dev      # Test local des fonctions
 
 ## Authentification
 
-Le client **n'a pas de compte GitHub** et n'en aura jamais. Le dépôt et le token appartiennent à l'agence (compte machine dédié, restreint aux dépôts des sites).
+**Un seul auteur par site.** Le client n'a ni compte Git ni compte tiers. Le dépôt et le token appartiennent à l'agence.
 
-- **Cloudflare Access** protège `/admin*` et `/api/*` : le client saisit son e-mail, reçoit un code à usage unique, entre. Aucun compte, aucun mot de passe.
-- La fonction vérifie le JWT Access à chaque appel et attribue le commit à l'e-mail authentifié.
-- Ajouter ou retirer un accès = modifier une liste d'adresses côté Cloudflare. Aucun redéploiement.
-- **Ne pas écrire de système d'authentification maison.** Si le besoin d'un écran de login sur mesure remonte, le signaler : c'est un arbitrage produit, pas une évidence technique.
+**Ce qui est protégé, c'est l'écriture, pas l'interface.** Quelqu'un qui ouvre l'overlay sans la clé modifie le DOM de son propre navigateur — sans conséquence, exactement comme avec les outils de développement. Ne pas dépenser d'effort à verrouiller l'overlay ; tout l'effort va sur les routes `/api/*`.
+
+**Mécanique**
+1. Clé saisie dans le panneau → `POST /api/auth`.
+2. Comparaison à `EDITOR_KEY_HASH` (argon2id) **en temps constant**.
+3. Si valide → cookie de session signé : `HttpOnly`, `Secure`, `SameSite=Strict`, 8 h.
+4. `/api/save` et `/api/upload` appellent `verifyAuth` avant tout accès au dépôt.
+
+**Non négociable**
+- **Limitation de débit sur `/api/auth`** : 5 tentatives par IP par 15 min. C'est le point de sécurité le plus critique du projet — sans elle, la clé tombe en force brute.
+- Hachage, jamais chiffrement : on vérifie, on ne retrouve pas.
+- Une clé distincte par site (`openssl rand -base64 24`), jamais de clé d'agence.
+- Auteur des commits : `EDITOR_NAME` / `EDITOR_EMAIL` en variables d'environnement.
+- Procédure de rotation documentée dans le README (nouvelle valeur → redéploiement → transmission).
+
+**Option multi-utilisateurs** : remplacer l'implémentation de `auth.ts` par Cloudflare Access ou Supabase Auth. Hors périmètre v1 — ne pas l'implémenter, mais ne rien écrire qui empêche la bascule.
 
 ---
 
 ## Ergonomie client (contraintes de développement)
 
-Le client accède au site livré via une seule URL, `/admin`, s'authentifie par code e-mail, et édite directement sur ses pages. Il ne voit ni tableau de bord, ni arborescence, ni terminologie technique.
+Le client accède au site livré via une seule URL, `/admin`, saisit la clé de son site, et édite directement sur ses pages. Il ne voit ni tableau de bord, ni arborescence, ni terminologie technique.
 
 - **Upload d'image** : accepter tout ce qui sort d'un appareil grand public (JPEG/PNG/HEIC jusqu'à ~20 Mo). Recadrage au ratio attendu, conversion WebP/AVIF, dimensions calculées côté serveur. **Ne jamais demander au client de redimensionner ou convertir.**
 - **Champ `alt`** : toujours libellé « Description de l'image », prérempli quand c'est possible.
@@ -154,10 +177,11 @@ Le client accède au site livré via une seule URL, `/admin`, s'authentifie par 
 
 ## Sécurité
 
-- `/api/save` : vérifier le JWT Access, valider avec le **même** schéma Zod que le build, restreindre les chemins à `/src/content/**`, plafonner la taille, limiter le débit.
+- `/api/auth` : comparaison en temps constant, limitation de débit, aucun détail dans le message d'erreur (« clé incorrecte », rien de plus).
+- `/api/save` : appeler `verifyAuth`, valider avec le **même** schéma Zod que le build, restreindre les chemins à `/src/content/**`, plafonner la taille, limiter le débit.
 - `/api/upload` : liste blanche de types MIME, taille maximale, renommage systématique.
 - **Verrou optimiste** : le SHA lu à l'ouverture est renvoyé au save ; en cas de divergence, refuser et remonter un conflit explicite plutôt qu'écraser.
-- Ne jamais journaliser tokens, JWT ou contenus de session.
+- Ne jamais journaliser la clé, le hash, le cookie de session ou le token Git.
 
 ---
 
@@ -181,3 +205,5 @@ Si l'un de ces besoins remonte, le signaler : il indique probablement qu'un CMS 
 - **Copier-coller depuis Word** : le client le fera dès la première semaine. Sans écrasement complet des styles inline, la page se retrouve avec du Calibri 11 pt en plein milieu de la charte.
 - **Photo de 8 Mo en 4032 × 3024** : cas nominal, pas cas limite. Le pipeline d'upload doit l'absorber sans intervention.
 - **Fuite de jargon dans un message d'erreur** : c'est par là que le vocabulaire technique revient dans l'interface. Vérifier chaque chaîne affichée.
+- **Vérification de la clé côté client** : raccourci tentant lors du développement de l'overlay, et faille totale. La clé part vers `/api/auth`, jamais ailleurs.
+- **Oubli de la limitation de débit** : le code fonctionne parfaitement sans elle, ce qui la rend facile à repousser « pour plus tard ». Elle fait partie du lot 1, pas du lot 6.

@@ -11,14 +11,14 @@
  *
  * La validation côté overlay ne compte pour rien ici : tout est revérifié.
  *
- * TODO lot 1 — vérification du JWT Cloudflare Access en tête de fonction.
+ * L'identité n'est jamais évaluée ici : `verifyAuth` en est le seul juge.
  * TODO lot 6 — limitation de débit.
  */
 import { pageSchema } from '../../src/content/schema';
+import { verifyAuth } from '../lib/auth';
 import { createGitProvider, GitError } from '../lib/git-provider';
 import {
   MAX_CONTENT_BYTES,
-  editorEnabled,
   isAllowedPath,
   json,
   resolveAuthor,
@@ -46,7 +46,7 @@ export function onRequest(): Response {
 }
 
 export async function onRequestPost({ request, env }: FunctionContext): Promise<Response> {
-  if (!editorEnabled(env)) {
+  if (!(await verifyAuth(request, env))) {
     return json({ error: 'not_found' }, 404);
   }
 

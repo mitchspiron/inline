@@ -20,15 +20,6 @@ export function json(data: unknown, status = 200): Response {
 }
 
 /**
- * Lot 0 : les fonctions ne sont ouvertes que si l'exploitant l'a explicitement
- * demandé. Elles ne sont PAS authentifiées — Cloudflare Access est le lot 1.
- * Tant que ce n'est pas fait, ne jamais poser EDITOR_ENABLED sur un site public.
- */
-export function editorEnabled(env: Record<string, unknown>): boolean {
-  return String(env.EDITOR_ENABLED ?? '') === 'true';
-}
-
-/**
  * Liste blanche des chemins accessibles en écriture. Tout le reste du dépôt —
  * code, configuration, workflows — est hors d'atteinte.
  */
@@ -42,10 +33,9 @@ export function isAllowedPath(path: unknown): path is string {
 export const MAX_CONTENT_BYTES = 100_000;
 
 /**
- * Attribution du commit.
+ * Attribution du commit. Un site, un auteur.
  *
- * TODO lot 1 — remplacer par l'e-mail issu du JWT Cloudflare Access :
- * l'identité doit venir de la plateforme, pas d'une variable d'environnement.
+ * TODO lot 1 — renommer en EDITOR_NAME / EDITOR_EMAIL, conformément au plan.
  */
 export function resolveAuthor(env: Record<string, unknown>): GitAuthor {
   return {

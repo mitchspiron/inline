@@ -5,8 +5,9 @@
  * dépôt et la version de référence du verrou optimiste. Le jeton reste ici :
  * la réponse ne contient que du contenu public et une empreinte.
  */
+import { verifyAuth } from '../lib/auth';
 import { createGitProvider, GitError } from '../lib/git-provider';
-import { editorEnabled, isAllowedPath, json, type FunctionContext } from '../lib/guard';
+import { isAllowedPath, json, type FunctionContext } from '../lib/guard';
 
 /** Toute autre méthode est refusée explicitement. */
 export function onRequest(): Response {
@@ -14,7 +15,7 @@ export function onRequest(): Response {
 }
 
 export async function onRequestGet({ request, env }: FunctionContext): Promise<Response> {
-  if (!editorEnabled(env)) {
+  if (!(await verifyAuth(request, env))) {
     return json({ error: 'not_found' }, 404);
   }
 

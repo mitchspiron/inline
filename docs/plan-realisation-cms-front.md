@@ -14,7 +14,8 @@
 | `output: 'static'`, jamais SSR ni hybride | Garantit que tout le contenu est dans le HTML servi. Le mode serveur n'apporte rien ici et fragilise cette garantie. |
 | Aucune directive `client:*` sur du contenu éditorial | Une hydratation posée par réflexe sort le contenu du HTML brut. Seuls l'overlay et les interactions purement visuelles y ont droit. |
 | **Le token GitHub ne quitte jamais le serveur** | Le client n'a pas de compte GitHub : le token est celui de l'agence. L'exposer côté navigateur donnerait un accès en écriture à tous les dépôts. |
-| Authentification **déléguée à Cloudflare Access** | Zéro ligne de code d'auth, zéro compte à créer pour le client, révocation immédiate. |
+| Authentification par **clé de site hachée (argon2id)**, vérifiée côté serveur | Un seul auteur par site : l'identité est connue par construction. Rend le projet indépendant de l'hébergeur. |
+| L'**hébergeur est interchangeable** | La vérification d'identité et l'accès au dépôt sont isolés derrière deux interfaces. Changer de plateforme = quelques heures. |
 | Styles **par variantes contraintes**, pas CSS libre | Préserve la charte graphique. Le client choisit dans une liste blanche validée par Zod. |
 | Git est la base de données | Historique, rollback, diff, aucune BDD à sauvegarder. |
 
@@ -26,9 +27,9 @@
   - *Content collections + Zod* : validation déclarative du schéma de contenu au build.
   - *i18n natif* : routage par locale, locale par défaut, helpers `hreflang`.
   - *`astro:assets`* : génération WebP/AVIF, dimensions calculées, `alt` obligatoire au niveau du type.
-- **Hébergement** : Cloudflare Pages — build sur push, CDN global, fonctions incluses.
-- **Écriture** : une Pages Function → API GitHub Contents → webhook → rebuild.
-- **Authentification** : Cloudflare Access (code à usage unique par e-mail, gratuit jusqu'à 50 utilisateurs).
+- **Hébergement** : interchangeable — Netlify, Cloudflare Pages, Vercel ou Supabase + statique. Prérequis : build sur push, CDN, fonctions serverless. *Défaut retenu : Netlify* (intégration GitHub **et** GitLab native).
+- **Écriture** : une fonction serverless → API du fournisseur Git → webhook → rebuild.
+- **Authentification** : **clé de site** unique, hachée en argon2id, stockée en variable d'environnement, vérifiée exclusivement côté serveur. Un auteur par site.
 - **Médias** : Cloudflare R2 ou Images, ou commit direct dans `/public/media` si le volume est faible.
 - **Overlay** : TypeScript vanilla, aucune dépendance framework, chargé uniquement en mode édition.
 
@@ -208,7 +209,7 @@ Le `<template>` par collection est **indispensable** : il évite de réimplémen
 
 Le client est un utilisateur non technique. Il ne verra jamais le code, le dépôt, ni le JSON. Ce qu'il reçoit à la livraison : **une URL, `monsite.fr/admin`, et rien d'autre.**
 
-1. Il ouvre l'URL, saisit son adresse e-mail, reçoit un code à six chiffres, le colle. Aucun logiciel à installer, aucun compte à créer, aucun mot de passe à retenir, rien à refaire en changeant d'ordinateur.
+1. Il ouvre l'URL et saisit la clé de son site (transmise une fois par lien à usage unique, à conserver dans son gestionnaire de mots de passe). Aucun logiciel à installer, aucun compte à créer. La session dure 8 heures.
 2. Il arrive sur **son site**, pas sur un tableau de bord. Il navigue dans ses pages via son propre menu, exactement comme un visiteur. Une bordure apparaît au survol de ce qui est modifiable.
 3. **Texte** : il clique, la zone devient éditable, il tape. Une barre flottante propose gras, italique, taille et les couleurs de sa charte — rien d'autre.
 4. **Image** : il clique dessus, un panneau s'ouvre, il choisit un fichier depuis son appareil. Le système accepte un JPEG de 8 Mo sorti d'un téléphone : recadrage au format attendu, conversion WebP/AVIF, dimensions calculées. Un seul champ en dessous, libellé **« Description de l'image »**, prérempli et modifiable.
@@ -266,28 +267,66 @@ Tout le reste de l'overlay se greffe sur ce principe : un chemin, un pointeur, u
 
 ## 6. Authentification et écriture
 
-**Le client n'a pas de compte GitHub et n'en aura jamais.** Le dépôt et le token appartiennent à l'agence — idéalement un compte machine dédié (`agence-bot`) restreint aux dépôts des sites.
+**Un seul auteur par site.** Le client n'a ni compte Git, ni compte sur une plateforme tierce. Le dépôt et le token appartiennent à l'agence (compte machine dédié, restreint aux dépôts des sites).
 
-### Cloudflare Access
+### Principe
 
-- Politique appliquée sur `/admin*` et `/api/*`.
-- Le client saisit son e-mail, reçoit un code à six chiffres, entre. Aucun compte, aucun mot de passe.
-- Ajouter ou retirer un accès = modifier une liste d'adresses. Révocation immédiate, sans redéploiement.
-- **Zéro ligne de code d'authentification à écrire.**
+**L'interface d'édition n'a pas besoin d'être protégée.** Quelqu'un qui ouvre l'overlay sans la clé modifie le DOM de son propre navigateur — exactement ce que permettent déjà les outils de développement. Sans conséquence.
+
+Ce qui est protégé, c'est **l'écriture**. La surface d'authentification se réduit donc à une route.
+
+### Mécanique
+
+1. Le client saisit la clé du site dans le panneau → `POST /api/auth`.
+2. La fonction compare à `EDITOR_KEY_HASH` (argon2id, variable d'environnement), en **temps constant**.
+3. Si valide → **cookie de session signé** : `HttpOnly`, `Secure`, `SameSite=Strict`, durée 8 h.
+4. `/api/save` et `/api/upload` vérifient ce cookie avant tout appel au dépôt.
+
+La clé ne transite qu'une fois, ne persiste jamais côté client, et le hash n'est jamais servi.
+
+**Chiffrement ≠ hachage.** La clé n'est pas chiffrée (réversible) mais hachée : on ne peut que vérifier, jamais retrouver.
+
+### Règles
+
+| Règle | Raison |
+|---|---|
+| **Une clé distincte par site**, jamais de clé d'agence | Une fuite reste circonscrite à un client. |
+| Clé générée aléatoirement (`openssl rand -base64 24`) | Une clé composée à la main tombe en force brute. |
+| **Limitation de débit obligatoire** sur `/api/auth` — 5 tentatives / IP / 15 min | Sans elle, une clé courte tombe en quelques heures. |
+| Vérification **jamais côté client** | Un hash servi au navigateur est attaquable hors ligne. |
+| Transmission par lien à usage unique | Évite que la clé reste indexée dans deux boîtes mail pendant cinq ans. |
+| Procédure de rotation documentée | Changement d'interlocuteur ou clé perdue : cas certain, pas hypothétique. |
+
+### Auteur des commits
+
+Un seul auteur par site : `EDITOR_NAME` et `EDITOR_EMAIL` en variables d'environnement, renseignées à la mise en place. L'historique Git reste lisible sans qu'aucune identité ne transite à l'édition.
+
+### Isolation de l'hébergeur
+
+Deux interfaces à isoler dès le lot 0 pour rendre la plateforme interchangeable :
+
+```
+functions/lib/git-provider.ts   → readFile / writeFile (GitHub, GitLab)
+functions/lib/auth.ts           → verifyAuth(request) / createSession(key)
+```
+
+Aucune vérification d'identité dispersée dans le code métier.
+
+### Option : authentification déléguée
+
+Pour un client multi-utilisateurs (plusieurs personnes éditent, traçabilité individuelle exigée), remplacer `auth.ts` par Cloudflare Access ou Supabase Auth — code à usage unique par e-mail, révocation par liste. Hors périmètre de la v1, mais l'interface `verifyAuth` permet la bascule sans toucher au reste.
 
 ### La fonction d'écriture
 
 ```
-/functions/api/save.ts
-  1. Lire l'identité fournie par Access (en-tête JWT vérifié)
+functions/api/save.ts
+  1. verifyAuth(request) — cookie de session valide
   2. Valider le payload avec le même schéma Zod que le build
-  3. Vérifier que le chemin cible est bien dans /src/content/**
+  3. Vérifier que le chemin cible est dans /src/content/**
   4. Assainir tous les champs richtext
-  5. PUT sur l'API GitHub Contents avec le SHA attendu
-  6. Attribuer le commit à l'e-mail du client authentifié
+  5. writeFile via git-provider, avec la version attendue (verrou optimiste)
+  6. Attribuer le commit à EDITOR_NAME / EDITOR_EMAIL
 ```
-
-Une centaine de lignes, déployée avec le site, aucun serveur à administrer.
 
 **Attention** : ne pas utiliser les endpoints API d'Astro (`src/pages/api/*`). En `output: 'static'` ils sont exécutés au build, pas à la requête. Passer par le mécanisme de fonctions de l'hébergeur, hors de `src/pages`.
 
@@ -335,12 +374,15 @@ Ce test est le filet de sécurité contre une directive `client:*` posée par in
 
 ## 9. Sécurité
 
-- **Aucun secret dans le dépôt ni dans un fichier servi.** Le token GitHub vit uniquement en variable d'environnement de la fonction.
-- Cloudflare Access sur `/admin*` et `/api/*` ; la fonction vérifie le JWT Access à chaque appel.
-- `/api/save` : identité vérifiée, schéma Zod validé, chemin restreint à `/src/content/**`, taille du payload plafonnée, limitation de débit.
+- **Aucun secret dans le dépôt ni dans un fichier servi.** Token Git, `EDITOR_KEY_HASH` et clé de signature de session vivent uniquement en variables d'environnement.
+- **Le hash de la clé n'est jamais servi au navigateur.** Toute vérification côté client est à proscrire : un hash exposé est attaquable hors ligne.
+- Comparaison de la clé en **temps constant** (argon2id).
+- **Limitation de débit sur `/api/auth`** : 5 tentatives par IP par 15 minutes. Point de sécurité le plus critique de l'ensemble.
+- Cookie de session : `HttpOnly`, `Secure`, `SameSite=Strict`, signé, expiration 8 h.
+- `/api/save` : session vérifiée, schéma Zod validé, chemin restreint à `/src/content/**`, taille plafonnée, limitation de débit.
 - `/api/upload` : liste blanche de types MIME, taille maximale, renommage systématique.
-- Verrou optimiste par SHA sur chaque écriture.
-- Ne jamais journaliser le contenu des tokens ni des JWT.
+- Verrou optimiste sur chaque écriture (SHA côté GitHub, `last_commit_id` côté GitLab).
+- Ne jamais journaliser la clé, le hash, le cookie de session ni le token Git.
 
 ---
 
@@ -349,7 +391,7 @@ Ce test est le filet de sécurité contre une directive `client:*` posée par in
 | Lot | Contenu | Charge |
 |---|---|---|
 | **0 — POC** | 1 page, 1 langue, texte seul, édition → commit → rebuild. Token local, sans Access. Valide la chaîne de bout en bout. | 2 j |
-| **1 — Socle + auth** | Projet Astro, content collections + Zod, tokens de style, déploiement Cloudflare Pages, **Access configuré**, fonction `save` avec token côté serveur. | 4 j |
+| **1 — Socle + auth** | Projet Astro, content collections + Zod, tokens de style, déploiement, `auth.ts` (clé argon2id + cookie signé + limitation de débit), fonction `save` avec token côté serveur. | 3 j |
 | **2 — Éditeur texte** | Overlay, détection `data-cms`, `contentEditable`, barre de variantes, richtext assaini, brouillon local, verrou optimiste. | 4 j |
 | **3 — Médias** | Panneau média, upload, gestion des `alt`, `astro:assets`. | 2,5 j |
 | **4 — Collections** | Ajout / suppression / duplication / réordonnancement, `<template>` par collection, carousels et témoignages. | 3 j |
@@ -357,9 +399,9 @@ Ce test est le filet de sécurité contre une directive `client:*` posée par in
 | **6 — Durcissement** | Limitation de débit, journalisation, gestion des conflits, `check-html` en CI, tests. | 1,5 j |
 | **7 — Industrialisation** | Dépôt modèle, script de création de site, script d'amorçage (extraction du JSON depuis un HTML existant), **modèle de capsule vidéo de formation client**, guide de migration. | 3 j |
 
-**Total v1 : environ 21 jours.** Chaque site suivant : 1 à 2 jours.
+**Total v1 : environ 20 jours.** Chaque site suivant : 1 à 2 jours.
 
-L'auth remonte en lot 1 : dès qu'un client non technique entre dans le périmètre, elle devient un prérequis et non un durcissement final. Astro fait gagner sur les lots 1, 3 et 5 (validation, images, i18n natifs).
+L'auth remonte en lot 1 : dès qu'un client non technique entre dans le périmètre, elle devient un prérequis et non un durcissement final. Astro fait gagner sur les lots 1, 3 et 5 (validation, images, i18n natifs). L'authentification par clé de site coûte environ une demi-journée de développement, contre une demi-journée de configuration pour une solution déléguée : le coût est équivalent, l'arbitrage porte sur l'indépendance vis-à-vis de l'hébergeur.
 
 ---
 
@@ -374,6 +416,10 @@ L'auth remonte en lot 1 : dès qu'un client non technique entre dans le périmè
 | Délai de publication (rebuild) | Message explicite dans l'overlay + prévisualisation immédiate côté client. |
 | Deux éditeurs simultanés | Verrou optimiste par SHA, message de conflit explicite. |
 | Fuite du token agence | Token jamais côté client, compte machine restreint, rotation planifiée. |
+| **Fuite de la clé de site** | Une clé distincte par site : l'incident reste circonscrit à un client. Rotation documentée. |
+| **Force brute sur `/api/auth`** | Limitation de débit obligatoire + clé aléatoire de 20+ caractères. |
+| **Clé perdue ou changement d'interlocuteur** | Procédure de rotation écrite dans le README, pas improvisée dans l'urgence. |
+| Dépendance à un hébergeur | `auth.ts` et `git-provider.ts` isolent les deux seuls points de couplage. |
 | **Copier-coller depuis Word** | Injecte polices, tailles et couleurs invisibles. Le nettoyage à la saisie doit tout écraser, sans exception. À tester explicitement. |
 | **Suppression accidentelle d'un item** | Confirmation obligatoire + restauration possible via l'historique Git. Le dire au client pour lever son appréhension. |
 | **Téléversement d'une vidéo lourde** | Interdit par le schéma : la vidéo passe par une URL d'intégration. |
@@ -387,7 +433,7 @@ L'auth remonte en lot 1 : dès qu'un client non technique entre dans le périmè
 
 Ce qui est remis à chaque mise en ligne :
 
-- **L'URL du panneau** (`monsite.fr/admin`) et l'adresse e-mail autorisée dans Cloudflare Access. Rien d'autre.
+- **L'URL du panneau** (`monsite.fr/admin`) et **la clé du site**, transmise par lien à usage unique — jamais dans le corps d'un e-mail. Conseiller au client de la conserver dans son gestionnaire de mots de passe.
 - **Une capsule vidéo de trois minutes**, enregistrée sur son propre site, montrant : modifier une accroche, remplacer une photo, ajouter un témoignage, publier. C'est le meilleur rapport temps investi / sollicitations évitées de tout le projet.
 - **Une page d'aide d'un écran** accessible depuis le panneau, reprenant les mêmes gestes en texte.
 - **L'énoncé explicite de la frontière** : textes, images et vidéos sont à sa main ; toute modification de structure, de mise en page ou de design passe par le développeur.

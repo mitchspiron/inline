@@ -194,8 +194,10 @@ valeur n'arrive pas dans le HTML.
 
 **Les routes `/api/content` et `/api/save` ne sont pas authentifiées.** Elles
 ne répondent que si `EDITOR_ENABLED=true`, et c'est leur seule protection.
-L'authentification (Cloudflare Access, code à usage unique par e-mail) est le
-lot 1.
+L'authentification par clé de site — clé hachée en argon2id côté serveur,
+cookie de session signé — est le lot 1. Elle vivra intégralement dans
+[functions/lib/auth.ts](functions/lib/auth.ts), seul point du dépôt qui décide
+qui a le droit d'écrire.
 
 Tant qu'elle n'est pas en place : **ne pas poser `EDITOR_ENABLED=true` sur un
 site accessible publiquement.** Le lot 0 s'essaie en local, ou derrière une
@@ -220,7 +222,7 @@ Ce qui reste à faire : identité vérifiée (lot 1) et limitation de débit
 
 Volontairement hors du lot 0 : médias et images, listes et collections,
 multilingue, barre d'outils de style (les tokens existent dans le schéma, aucun
-bouton ne les change), richtext et assainissement, Cloudflare Access, tableau
+bouton ne les change), richtext et assainissement, authentification, tableau
 de bord et arborescence de contenu.
 
 Deux fichiers ne sont pas non plus là, faute d'objet à ce stade :
