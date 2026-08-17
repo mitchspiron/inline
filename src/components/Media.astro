@@ -1,0 +1,95 @@
+---
+import { Image } from 'astro:assets';
+import type { ImageField, Page, VideoField } from '../content/schema';
+import { embedUrl } from '../lib/video';
+
+interface Props {
+  data: Page;
+  path: string;
+  class?: string;
+  /** Largeurs proposées au navigateur. Structure : développeur. */
+  widths?: number[];
+  sizes?: string;
+}
+
+const { data, path, class: extraClass = '', widths, sizes } = Astro.props;
+
+function resolveField(source: unknown, keyPath: string): ImageField | VideoField {
+  const node = keyPath
+    .split('.')
+    .reduce<any>((acc, key) => (acc == null ? undefined : acc[key]), source);
+
+  if (node == null) {
+    throw new Error(`[Media] Le chemin « ${keyPath} » n'existe pas dans le contenu.`);
+  }
+  if (node.type !== 'media') {
+    throw new Error(`[Media] Le chemin « ${keyPath} » est de type « ${node.type} », pas un média.`);
+  }
+  return node as ImageField | VideoField;
+}
+
+/**
+ * Les fichiers vivent dans `src/media` et non dans `public/media` : c'est la
+ * seule façon pour `<Image />` de les traiter au build — AVIF, WebP, jeu de
+ * largeurs, dimensions calculées. Un fichier de `public/` serait servi tel
+ * quel, sans aucune de ces garanties.
+ */
+const library = import.meta.glob<{ default: ImageMetadata }>('/src/media/**/*.{png,jpg,jpeg,webp,avif}', {
+  eager: true,
+});
+
+function resolveImage(src: string): ImageMetadata {
+  const key = `/src/media/${src.replace(/^\/+/, '').replace(/^src\/media\//, '')}`;
+  const entry = library[key];
+  if (!entry) {
+    throw new Error(
+      `[Media] Le fichier « ${src} » est absent de src/media. ` +
+        `Fichiers disponibles : ${Object.keys(library).join(', ') || 'aucun'}`,
+    );
+  }
+  return entry.default;
+}
+
+const field = resolveField(data, path);
+---
+
+{
+  field.kind === 'image' ? (
+    <Image
+      src={resolveImage(field.src)}
+      alt={field.alt}
+      widths={widths}
+      sizes={sizes}
+      formats={['avif', 'webp']}
+      class={extraClass}
+      data-cms={path}
+      data-cms-type="media"
+      data-cms-kind="image"
+    />
+  ) : (
+    /*
+      Le contenu de l'iframe est chez le fournisseur ; le titre, lui, est dans
+      le HTML servi. `loading="lazy"` ne retire rien de l'index : ce n'est pas
+      une hydratation de composant, l'élément est là dès la source.
+    */
+    <figure
+      class={extraClass}
+      data-cms={path}
+      data-cms-type="media"
+      data-cms-kind="video"
+      data-cms-provider={field.provider}
+      data-cms-video-id={field.videoId}
+    >
+      <iframe
+        src={embedUrl(field.provider, field.videoId)}
+        title={field.title}
+        loading="lazy"
+        allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen
+        width="560"
+        height="315"
+      />
+      <figcaption>{field.title}</figcaption>
+    </figure>
+  )
+}

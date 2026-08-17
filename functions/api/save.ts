@@ -17,6 +17,7 @@
 import { pageSchema } from '../../src/content/schema';
 import { verifyAuth } from '../lib/auth';
 import { sanitizeRichtext, sanitizeText } from '../lib/sanitize';
+import { isValidVideoReference } from '../../src/lib/video';
 import { createGitProvider, GitError } from '../lib/git-provider';
 import {
   MAX_CONTENT_BYTES,
@@ -54,6 +55,33 @@ function sanitizeFields(node: unknown): void {
   }
 
   for (const child of Object.values(record)) sanitizeFields(child);
+}
+
+/** Un nom de fichier média, et rien qui puisse servir à sortir du dossier. */
+const MEDIA_FILE = /^[a-z0-9]+(?:-[a-z0-9]+)*\.(jpg|png|webp)$/;
+
+/**
+ * Contrôles que le schéma ne peut pas exprimer.
+ *
+ * Zod dit que `src` est une chaîne non vide et que `provider` est dans une
+ * liste ; il ne dit pas que `src` doit désigner un fichier du dossier des
+ * médias, ni qu'un identifiant YouTube fait onze caractères.
+ */
+function mediaIsValid(node: unknown): boolean {
+  if (node == null || typeof node !== 'object') return true;
+
+  const record = node as Record<string, unknown>;
+  if (record.type === 'media') {
+    if (record.kind === 'image') {
+      return typeof record.src === 'string' && MEDIA_FILE.test(record.src);
+    }
+    if (record.kind === 'video') {
+      return isValidVideoReference(String(record.provider), String(record.videoId));
+    }
+    return false;
+  }
+
+  return Object.values(record).every(mediaIsValid);
 }
 
 /** Constructions qui ne sont jamais du contenu, quelle qu'en soit l'origine. */
@@ -118,6 +146,11 @@ export async function onRequestPost({ request, env }: FunctionContext): Promise<
    */
   if (containsAttack(parsed)) {
     console.error('[save] contenu refusé : balisage manifestement hostile');
+    return json({ error: 'invalid_content' }, 422);
+  }
+
+  if (!mediaIsValid(parsed)) {
+    console.error('[save] contenu refusé : référence de média invalide');
     return json({ error: 'invalid_content' }, 422);
   }
 

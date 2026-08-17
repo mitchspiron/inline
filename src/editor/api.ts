@@ -71,3 +71,50 @@ export async function publish(payload: {
   if (response.status === 400 || response.status === 422) return { status: 'rejected' };
   return { status: 'failed' };
 }
+
+export type UploadResult =
+  | { status: 'uploaded'; src: string; width: number; height: number }
+  | { status: 'expired' }
+  | { status: 'rejected'; kind: string }
+  | { status: 'too_large' }
+  | { status: 'failed' };
+
+/**
+ * Envoie une image déjà préparée par le navigateur. Le fichier part en WebP,
+ * recadré et redimensionné : ce qui traverse le réseau se compte en centaines
+ * de kilo-octets, jamais en méga-octets.
+ */
+export async function uploadImage(blob: Blob, fileName: string): Promise<UploadResult> {
+  const form = new FormData();
+  form.append('file', blob, fileName);
+  form.append('name', fileName);
+
+  let response: Response;
+  try {
+    response = await fetch('/api/upload', { method: 'POST', body: form });
+  } catch (error) {
+    console.warn('[editor] envoi impossible', error);
+    return { status: 'failed' };
+  }
+
+  if (response.ok) {
+    const body = (await response.json()) as { src: string; width: number; height: number };
+    return { status: 'uploaded', ...body };
+  }
+
+  const detail = await response.text().catch(() => '');
+  console.warn('[editor] envoi refusé', response.status, detail);
+
+  if (response.status === 401) return { status: 'expired' };
+  if (response.status === 413) return { status: 'too_large' };
+  if (response.status === 415) {
+    let kind = 'unknown';
+    try {
+      kind = String(JSON.parse(detail).kind ?? 'unknown');
+    } catch {
+      /* le détail reste en console */
+    }
+    return { status: 'rejected', kind };
+  }
+  return { status: 'failed' };
+}

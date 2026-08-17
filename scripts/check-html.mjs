@@ -38,7 +38,11 @@ function decode(html) {
 /** Aplatit les champs textuels du JSON en { chemin: valeur }. */
 function collectTextFields(node, path = [], out = {}) {
   if (node && typeof node === 'object' && (node.type === 'text' || node.type === 'richtext')) {
-    out[path.join('.')] = node.value;
+    out[path.join('.')] = { kind: node.type, value: node.value };
+    return out;
+  }
+  if (node && typeof node === 'object' && node.type === 'media') {
+    out[path.join('.')] = { kind: node.kind, field: node };
     return out;
   }
   if (node && typeof node === 'object') {
@@ -63,18 +67,47 @@ for (const page of PAGES) {
   const haystack = decode(rawHtml);
   const fields = collectTextFields(data);
 
-  // 1. Toutes les valeurs sont dans le HTML servi.
-  for (const [path, value] of Object.entries(fields)) {
-    const needle = value.replace(/\s+/g, ' ').trim();
-    if (!haystack.includes(needle)) {
-      errors.push(`${page.html} : la valeur de « ${path} » est absente du HTML brut.`);
+  // 1. Tout le contenu est dans le HTML servi.
+  for (const [path, entry] of Object.entries(fields)) {
+    if (entry.kind === 'text' || entry.kind === 'richtext') {
+      const needle = entry.value.replace(/\s+/g, ' ').trim();
+      if (!haystack.includes(needle)) {
+        errors.push(`${page.html} : la valeur de « ${path} » est absente du HTML brut.`);
+      }
+      continue;
+    }
+
+    if (entry.kind === 'image') {
+      // Le fichier est renommé au build ; son nom d'origine reste reconnaissable.
+      const stem = entry.field.src.replace(/\.[^.]*$/, '');
+      if (!rawHtml.includes(stem)) {
+        errors.push(`${page.html} : l'image de « ${path} » n'apparaît pas dans le HTML brut.`);
+      }
+      if (!haystack.includes(entry.field.alt.replace(/\s+/g, ' ').trim())) {
+        errors.push(`${page.html} : la description de l'image « ${path} » est absente.`);
+      }
+      // width et height sont exigés partout : sans eux, la page saute au chargement.
+      const tag = new RegExp(`<img[^>]*${stem}[^>]*>`).exec(rawHtml)?.[0] ?? '';
+      if (!/width="\d+"/.test(tag) || !/height="\d+"/.test(tag)) {
+        errors.push(`${page.html} : l'image de « ${path} » n'a pas ses dimensions.`);
+      }
+      continue;
+    }
+
+    if (entry.kind === 'video') {
+      if (!rawHtml.includes(entry.field.videoId)) {
+        errors.push(`${page.html} : la vidéo de « ${path} » n'apparaît pas dans le HTML brut.`);
+      }
+      if (!haystack.includes(entry.field.title.replace(/\s+/g, ' ').trim())) {
+        errors.push(`${page.html} : le titre de la vidéo « ${path} » est absent.`);
+      }
     }
   }
 
   // 2. Aucun data-cms orphelin.
   for (const match of rawHtml.matchAll(/data-cms="([^"]+)"/g)) {
     if (!(match[1] in fields)) {
-      errors.push(`${page.html} : data-cms="${match[1]}" ne correspond à aucun champ texte.`);
+      errors.push(`${page.html} : data-cms="${match[1]}" ne correspond à aucun champ du contenu.`);
     }
   }
 

@@ -6,17 +6,18 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build && npm run bundle:editor",
-    "bundle:editor": "esbuild src/editor/index.ts --bundle --minify --format=esm --target=es2020 --outfile=dist/editor/overlay.js",
+    "bundle:editor": "esbuild src/editor/index.ts --bundle --minify --format=esm --target=es2020 --splitting --outdir=dist/editor --entry-names=overlay --chunk-names=purificateur-[hash]",
     "preview": "astro preview",
     "check": "node scripts/check-html.mjs && node scripts/check-secrets.mjs",
-    "test": "npm run test:git && npm run test:auth && npm run test:sanitize && npm run build && npm run test:editor",
+    "test": "npm run test:git && npm run test:auth && npm run test:sanitize && npm run test:media && npm run build && npm run test:editor",
     "test:git": "node scripts/test-git-provider.mjs",
     "test:auth": "node scripts/test-auth.mjs",
     "test:editor": "node scripts/test-editor.mjs",
     "serve:functions": "wrangler pages dev",
     "mock:git": "node scripts/mock-git-api.mjs",
     "make:key": "node scripts/make-key.mjs",
-    "test:sanitize": "node scripts/test-sanitize.mjs"
+    "test:sanitize": "node scripts/test-sanitize.mjs",
+    "test:media": "node scripts/test-media.mjs"
   },
   "dependencies": {
     "@noble/hashes": "^2.3.0",

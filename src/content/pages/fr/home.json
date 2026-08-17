@@ -51,6 +51,23 @@
         "type": "richtext",
         "value": "Un accompagnement <strong>complet</strong>, du cadrage à la mise en ligne. <a href=\"/contact\">Parlons-en</a> quand vous voulez."
       }
+    },
+    "showcase": {
+      "visual": {
+        "type": "media",
+        "kind": "image",
+        "src": "equipe-en-reunion.webp",
+        "alt": "Notre équipe en réunion de cadrage",
+        "width": 1600,
+        "height": 900
+      },
+      "film": {
+        "type": "media",
+        "kind": "video",
+        "provider": "youtube",
+        "videoId": "aqz-KE-bpKQ",
+        "title": "Présentation de notre méthode"
+      }
     }
   }
 }

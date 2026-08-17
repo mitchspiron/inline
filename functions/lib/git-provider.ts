@@ -21,9 +21,13 @@ export interface ReadResult {
 
 export interface GitProvider {
   readFile(path: string): Promise<ReadResult>;
+  /**
+   * `content` accepte des octets pour les fichiers qui n'en sont pas —
+   * une image téléversée. Un fichier neuf s'écrit avec `version` vide.
+   */
   writeFile(
     path: string,
-    content: string,
+    content: string | Uint8Array,
     version: string,
     message: string,
     author: GitAuthor,
@@ -60,6 +64,17 @@ export function toBase64(text: string): string {
   const bytes = new TextEncoder().encode(text);
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+/** Même encodage, pour un fichier qui n'est pas du texte. */
+export function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  // Par tranches : passer un tableau de plusieurs Mo à `apply` fait déborder
+  // la pile d'appels.
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
   return btoa(binary);
 }
 

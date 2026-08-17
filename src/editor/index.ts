@@ -9,8 +9,10 @@
  */
 import { mountUi, type Ui } from './bar';
 import { clearDraft, formatSavedAt, readDraft, writeDraft, type FieldEdit } from './draft';
-import { loadContent, publish } from './api';
-import { sanitizeRichtext, sanitizeText } from './sanitize';
+import { loadContent, publish, uploadImage } from './api';
+import { createMediaPanel } from './media';
+import { embedUrl } from '../lib/video';
+import { loadSanitizer, sanitizeRichtext, sanitizeText } from './sanitize';
 import { createToolbar, type RichCommand, type StyleChange } from './toolbar';
 import {
   ALIGNMENTS,
@@ -27,12 +29,14 @@ interface Context {
   page: string;
 }
 
-type FieldKind = 'text' | 'richtext';
+type FieldKind = 'text' | 'richtext' | 'media';
 
 interface Zone {
   path: string;
   element: HTMLElement;
   kind: FieldKind;
+  /** Pour un média seulement : image ou vidéo. */
+  mediaKind?: 'image' | 'video';
 }
 
 const DEFAULT_STYLE: StyleTokens = {
@@ -88,15 +92,21 @@ function start(context: Context): void {
   const zones = new Map<string, Zone>();
   for (const element of document.querySelectorAll<HTMLElement>('[data-cms]')) {
     const path = element.dataset.cms!;
-    const kind: FieldKind = element.dataset.cmsType === 'richtext' ? 'richtext' : 'text';
-    zones.set(path, { path, element, kind });
+    const declared = element.dataset.cmsType;
+    const kind: FieldKind =
+      declared === 'richtext' ? 'richtext' : declared === 'media' ? 'media' : 'text';
+    const mediaKind = element.dataset.cmsKind === 'video' ? 'video' : 'image';
+    zones.set(path, { path, element, kind, mediaKind: kind === 'media' ? mediaKind : undefined });
   }
   if (zones.size === 0) return;
 
   /** Valeurs de référence : celles du dépôt une fois le contenu chargé. */
   const baseValues: Record<string, string> = {};
   const baseStyles: Record<string, StyleTokens> = {};
+  /** Pour les médias, la référence est l'objet du champ, pas une chaîne. */
+  const baseMedia: Record<string, Record<string, unknown>> = {};
   for (const zone of zones.values()) {
+    if (zone.kind === 'media') continue;
     baseValues[zone.path] =
       zone.kind === 'richtext' ? zone.element.innerHTML : (zone.element.textContent ?? '');
     if (zone.kind === 'text') baseStyles[zone.path] = styleFromElement(zone.element);
@@ -111,6 +121,90 @@ function start(context: Context): void {
 
   const ui: Ui = mountUi({ onPublish: doPublish, onReset: doReset });
   const toolbar = createToolbar({ onStyle: applyStyleChange, onCommand: runCommand });
+
+  const mediaPanel = createMediaPanel({
+    onImage(result) {
+      if (!active || active.kind !== 'media') return;
+      const path = active.path;
+      const change: Record<string, string | number> = {
+        alt: result.alt,
+        width: result.width,
+        height: result.height,
+      };
+      // Une saisie de description seule ne change pas le fichier.
+      if (result.src) change.src = result.src;
+
+      edits[path] = { ...edits[path], media: { ...(edits[path]?.media ?? {}), ...change } };
+      prune(path);
+
+      const image = active.element as HTMLImageElement;
+      if (result.previewUrl) {
+        // Le fichier définitif n'existe qu'après la reconstruction du site :
+        // en attendant, on montre celui que le navigateur vient de préparer.
+        image.removeAttribute('srcset');
+        image.src = result.previewUrl;
+      }
+      image.alt = result.alt;
+      markDirty();
+    },
+
+    onVideo(result) {
+      if (!active || active.kind !== 'media') return;
+      const path = active.path;
+      edits[path] = {
+        ...edits[path],
+        media: {
+          ...(edits[path]?.media ?? {}),
+          provider: result.provider,
+          videoId: result.videoId,
+          title: result.title,
+        },
+      };
+      prune(path);
+      applyMediaToDom(active, edits[path].media!);
+      markDirty();
+    },
+
+    async onUpload(blob, fileName) {
+      const result = await uploadImage(blob, fileName);
+      if (result.status === 'uploaded') return { src: result.src };
+
+      if (result.status === 'expired') {
+        return { error: 'Votre session a pris fin. Reconnectez-vous pour envoyer une image.' };
+      }
+      if (result.status === 'too_large') {
+        return { error: 'Cette image est trop lourde. Essayez-en une autre.' };
+      }
+      if (result.status === 'rejected') {
+        return {
+          error:
+            result.kind === 'video'
+              ? "Ceci est une vidéo. Pour ajouter une vidéo, utilisez l'emplacement prévu et collez son lien."
+              : "Ce type de fichier n'est pas accepté. Choisissez une photo.",
+        };
+      }
+      return { error: "L'image n'a pas pu être envoyée, réessayez." };
+    },
+  });
+
+  /** Reflète dans la page ce que le client vient de choisir. */
+  function applyMediaToDom(zone: Zone, media: Record<string, unknown>): void {
+    if (zone.mediaKind === 'video') {
+      const frame = zone.element.querySelector('iframe');
+      const caption = zone.element.querySelector('figcaption');
+      const provider = String(media.provider ?? baseMedia[zone.path]?.provider ?? 'youtube');
+      const videoId = String(media.videoId ?? baseMedia[zone.path]?.videoId ?? '');
+      const title = String(media.title ?? baseMedia[zone.path]?.title ?? '');
+      if (frame && videoId) {
+        frame.src = embedUrl(provider as 'youtube' | 'vimeo', videoId);
+        frame.title = title;
+      }
+      if (caption) caption.textContent = title;
+      return;
+    }
+    const image = zone.element as HTMLImageElement;
+    if (typeof media.alt === 'string') image.alt = media.alt;
+  }
 
   function currentStyle(path: string): StyleTokens {
     return { ...(baseStyles[path] ?? DEFAULT_STYLE), ...(edits[path]?.style ?? {}) };
@@ -128,7 +222,13 @@ function start(context: Context): void {
     if (!edit) return;
     if (edit.value !== undefined && edit.value === baseValues[path]) delete edit.value;
     if (edit.style && Object.keys(edit.style).length === 0) delete edit.style;
-    if (edit.value === undefined && !edit.style) delete edits[path];
+    if (edit.media) {
+      for (const [key, value] of Object.entries(edit.media)) {
+        if (baseMedia[path]?.[key] === value) delete edit.media[key];
+      }
+      if (Object.keys(edit.media).length === 0) delete edit.media;
+    }
+    if (edit.value === undefined && !edit.style && !edit.media) delete edits[path];
   }
 
   function setValue(path: string, value: string): void {
@@ -155,7 +255,7 @@ function start(context: Context): void {
     markDirty();
   }
 
-  function runCommand(command: RichCommand): void {
+  async function runCommand(command: RichCommand): Promise<void> {
     if (!active || active.kind !== 'richtext') return;
     active.element.focus();
 
@@ -174,15 +274,36 @@ function start(context: Context): void {
     }
 
     // Le navigateur produit ce qu'il veut ; on ne garde que la liste blanche.
-    const cleaned = sanitizeRichtext(active.element.innerHTML);
-    active.element.innerHTML = cleaned;
-    setValue(active.path, cleaned);
+    const zone = active;
+    const cleaned = await sanitizeRichtext(zone.element.innerHTML);
+    zone.element.innerHTML = cleaned;
+    setValue(zone.path, cleaned);
   }
 
   // --- Édition ------------------------------------------------------------
 
   for (const zone of zones.values()) {
     const { element, path, kind } = zone;
+
+    if (kind === 'media') {
+      element.addEventListener('click', (event) => {
+        event.preventDefault();
+        active = zone;
+        toolbar.hide();
+
+        const current = { ...(baseMedia[path] ?? {}), ...(edits[path]?.media ?? {}) };
+        if (zone.mediaKind === 'video') {
+          mediaPanel.openVideo(element, { title: String(current.title ?? '') });
+        } else {
+          mediaPanel.openImage(element, {
+            alt: String(current.alt ?? (element as HTMLImageElement).alt ?? ''),
+            width: Number(current.width ?? (element as HTMLImageElement).naturalWidth ?? 16),
+            height: Number(current.height ?? (element as HTMLImageElement).naturalHeight ?? 9),
+          });
+        }
+      });
+      continue;
+    }
 
     element.addEventListener('click', (event) => {
       if (element.getAttribute('contenteditable') !== 'true') {
@@ -191,8 +312,13 @@ function start(context: Context): void {
         element.focus();
       }
       active = zone;
-      if (kind === 'text') toolbar.showForText(element, currentStyle(path));
-      else toolbar.showForRichtext(element);
+      if (kind === 'text') {
+        toolbar.showForText(element, currentStyle(path));
+      } else {
+        // Chargé maintenant, pour être prêt au premier collage.
+        void loadSanitizer();
+        toolbar.showForRichtext(element);
+      }
     });
 
     element.addEventListener('input', () => {
@@ -209,9 +335,10 @@ function start(context: Context): void {
       if (active === zone) active = null;
 
       if (kind === 'richtext') {
-        const cleaned = sanitizeRichtext(element.innerHTML);
-        if (cleaned !== element.innerHTML) element.innerHTML = cleaned;
-        setValue(path, cleaned);
+        void sanitizeRichtext(element.innerHTML).then((cleaned) => {
+          if (cleaned !== element.innerHTML) element.innerHTML = cleaned;
+          setValue(path, cleaned);
+        });
       }
     });
 
@@ -233,7 +360,7 @@ function start(context: Context): void {
      * arrive avec ses polices, ses tailles et ses couleurs. On ne conserve
      * jamais la mise en forme d'origine.
      */
-    element.addEventListener('paste', (event) => {
+    element.addEventListener('paste', async (event) => {
       event.preventDefault();
       const clipboard = event.clipboardData;
       if (!clipboard) return;
@@ -247,11 +374,11 @@ function start(context: Context): void {
 
       const html = clipboard.getData('text/html');
       const cleaned = html
-        ? sanitizeRichtext(html)
+        ? await sanitizeRichtext(html)
         : sanitizeText(clipboard.getData('text/plain'));
       document.execCommand('insertHTML', false, cleaned);
 
-      const settled = sanitizeRichtext(element.innerHTML);
+      const settled = await sanitizeRichtext(element.innerHTML);
       element.innerHTML = settled;
       setValue(path, settled);
     });
@@ -262,9 +389,18 @@ function start(context: Context): void {
   function applyEditToDom(path: string, edit: FieldEdit): void {
     const zone = zones.get(path);
     if (!zone) return;
+    if (zone.kind === 'media') {
+      if (edit.media) applyMediaToDom(zone, edit.media);
+      return;
+    }
     if (edit.value !== undefined) {
-      if (zone.kind === 'richtext') zone.element.innerHTML = sanitizeRichtext(edit.value);
-      else zone.element.textContent = edit.value;
+      if (zone.kind === 'richtext') {
+        void sanitizeRichtext(edit.value).then((cleaned) => {
+          zone.element.innerHTML = cleaned;
+        });
+      } else {
+        zone.element.textContent = edit.value;
+      }
     }
     if (zone.kind === 'text') applyStyle(zone.element, currentStyle(path));
   }
@@ -307,6 +443,10 @@ function start(context: Context): void {
     for (const path of Object.keys(edits)) {
       const zone = zones.get(path);
       if (!zone) continue;
+      if (zone.kind === 'media') {
+        applyMediaToDom(zone, baseMedia[path] ?? {});
+        continue;
+      }
       if (zone.kind === 'richtext') zone.element.innerHTML = baseValues[path] ?? '';
       else zone.element.textContent = baseValues[path] ?? '';
       if (zone.kind === 'text') applyStyle(zone.element, baseStyles[path] ?? DEFAULT_STYLE);
@@ -314,6 +454,7 @@ function start(context: Context): void {
     edits = {};
     clearDraft(context.file);
     toolbar.hide();
+    mediaPanel.close();
     ui.clearBanner();
     ui.setDirty(false);
   }
@@ -347,6 +488,15 @@ function start(context: Context): void {
         continue;
       }
       const field = target.parent[target.key];
+
+      if (zone.kind === 'media') {
+        const { type, kind, ...rest } = field;
+        baseMedia[zone.path] = rest;
+        prune(zone.path);
+        if (edits[zone.path]?.media) applyMediaToDom(zone, edits[zone.path].media!);
+        continue;
+      }
+
       baseValues[zone.path] = String(field.value ?? '');
       if (zone.kind === 'text' && field.style) {
         baseStyles[zone.path] = { ...DEFAULT_STYLE, ...field.style };
@@ -383,6 +533,7 @@ function start(context: Context): void {
 
     ui.clearBanner();
     toolbar.hide();
+    mediaPanel.close();
     ui.setBusy(true);
 
     const next = JSON.parse(JSON.stringify(source));
@@ -395,11 +546,14 @@ function start(context: Context): void {
 
       if (edit.value !== undefined) {
         field.value =
-          zone?.kind === 'richtext' ? sanitizeRichtext(edit.value) : sanitizeText(edit.value);
+          zone?.kind === 'richtext'
+            ? await sanitizeRichtext(edit.value)
+            : sanitizeText(edit.value);
       }
       if (edit.style && field.style) {
         field.style = { ...field.style, ...edit.style };
       }
+      if (edit.media) Object.assign(field, edit.media);
     }
 
     const result = await publish({
@@ -419,6 +573,11 @@ function start(context: Context): void {
         const target = resolve(next, path);
         if (!target) continue;
         const field = target.parent[target.key];
+        if (zones.get(path)?.kind === 'media') {
+          const { type, kind, ...rest } = field;
+          baseMedia[path] = rest;
+          continue;
+        }
         baseValues[path] = String(field.value ?? '');
         if (field.style) baseStyles[path] = { ...DEFAULT_STYLE, ...field.style };
       }

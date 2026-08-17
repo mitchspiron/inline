@@ -312,6 +312,7 @@ function paste(page, element, html) {
 }
 
 paste(rich, detail, WORD_PASTE);
+await new Promise((resolve) => setTimeout(resolve, 60));
 const inserted = rich.commands.filter((c) => c.name === 'insertHTML').pop();
 check('le collage passe par un contenu nettoyé', !!inserted, JSON.stringify(rich.commands));
 check('aucun attribut style ne subsiste', !/style\s*=/i.test(inserted?.value ?? ''), inserted?.value);
@@ -322,6 +323,7 @@ check('le texte est conservé', /Texte/.test(inserted?.value ?? ''), inserted?.v
 check('le gras est conservé', /<strong>collé<\/strong>/.test(inserted?.value ?? ''), inserted?.value);
 
 paste(rich, detail, 'avant<script>alert(1)</script><img src=x onerror=alert(1)>après');
+await new Promise((resolve) => setTimeout(resolve, 60));
 const dangerous = rich.commands.filter((c) => c.name === 'insertHTML').pop();
 check('un script collé est retiré côté navigateur', !/<script|onerror/i.test(dangerous?.value ?? ''), dangerous?.value);
 check('le texte autour du script est conservé', dangerous?.value === 'avantaprès', dangerous?.value);

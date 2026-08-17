@@ -9,8 +9,9 @@ Le client reçoit une URL, `monsite.fr/admin`, et une clé. Il entre, il modifie
 ses textes sur ses propres pages, il publie. Chaque publication est un commit ;
 le site se reconstruit dans la minute.
 
-**État : lots 0 et 1 livrés.** Une page, une langue, du texte. Médias, listes et
-multilingue arrivent avec leurs lots — voir *Ce qui n'est pas encore là*.
+**État : lots 0 à 3 livrés.** Une page, une langue : textes, richtext, images et
+vidéos. Listes et multilingue arrivent avec leurs lots — voir *Ce qui n'est pas
+encore là*.
 
 ---
 
@@ -79,7 +80,7 @@ npm run dev              # Serveur Astro seul — le site, sans les fonctions ni
 npm run build            # Build de production (échoue si le contenu est invalide)
 npm run serve:functions  # Site + fonctions : c'est ici qu'on édite en local
 npm run check            # Contenu bien dans le HTML brut + aucun secret dans le build
-npm run test             # Fournisseur Git, authentification, overlay
+npm run test             # Fournisseur Git, authentification, assainissement, médias, overlay
 npm run make:key         # Génère une clé de site, son empreinte, un secret de session
 npm run mock:git         # Faux service Git local, pour essayer sans dépôt
 ```
@@ -238,8 +239,11 @@ durée sur la route `/api/auth`.
 1. Ajouter la clé dans `src/content/pages/fr/home.json` :
    - texte simple → `{ "type": "text", "value": "…", "style": { … } }`
    - paragraphe avec emphase ou lien → `{ "type": "richtext", "value": "…" }`
-2. Poser un `<Editable data={data} path="blocks.mon.champ" as="h2" />` dans la
-   page.
+   - image → `{ "type": "media", "kind": "image", "src": "…", "alt": "…", "width": …, "height": … }`
+   - vidéo → `{ "type": "media", "kind": "video", "provider": "youtube", "videoId": "…", "title": "…" }`
+2. Poser le composant correspondant dans la page :
+   `<Editable data={data} path="blocks.mon.champ" as="h2" />` pour du texte,
+   `<Media data={data} path="blocks.mon.visuel" />` pour un média.
 
 Le build échoue si le chemin n'existe pas, et `npm run check` échoue si la
 valeur n'arrive pas dans le HTML.
@@ -260,6 +264,40 @@ passer.
 paragraphe collé depuis Word arrive avec ses polices, ses tailles en points et
 ses couleurs ; il ne reste que le texte, le gras et l'italique.
 
+**Sur une image**, un panneau s'ouvre : choisir un fichier sur l'appareil, et un
+seul champ en dessous, « Description de l'image », prérempli quand le nom du
+fichier veut dire quelque chose. Le client n'a jamais à redimensionner ni à
+convertir quoi que ce soit.
+
+**Sur une vidéo**, un champ où coller un lien YouTube ou Vimeo. Toutes les
+formes fonctionnent : la barre d'adresse, le bouton « Partager », le code
+d'intégration collé en entier. Aucun fichier vidéo n'est jamais téléversé.
+
+### Où passe le traitement des images
+
+Trois étapes, chacune là où elle a les moyens de se faire :
+
+| Étape | Où | Quoi |
+|---|---|---|
+| Décodage, redressement, recadrage, réduction, conversion WebP | Navigateur | Une photo de 15 Mo part en quelques centaines de Ko |
+| Contrôle et rangement | Fonction | Format reconnu aux octets, dimensions lues dans l'en-tête, fichier renommé |
+| AVIF, WebP, jeu de largeurs | Build | `<Image />` d'`astro:assets` |
+
+Le navigateur fait le travail sur les pixels parce que le runtime des fonctions
+n'a pas de codec : la seule voie serait un module WebAssembly, et la compilation
+de WebAssembly à l'exécution y est interdite. Le résultat est meilleur de toute
+façon — ce qui traverse le réseau se compte en centaines de kilo-octets, et le
+dépôt ne grossit pas de photos brutes.
+
+**La fonction ne croit rien de ce qu'on lui déclare** : ni le type MIME annoncé,
+ni le nom du fichier, ni les dimensions. Un `.jpg` qui contient un SVG est
+refusé, un fichier vidéo aussi — avec un message qui dit lequel des deux
+c'était.
+
+**Les fichiers vivent dans `src/media`, pas dans `public/media`.** C'est la
+seule façon pour `<Image />` de les traiter au build. Un fichier de `public/`
+serait servi tel quel, sans AVIF, sans jeu de largeurs, sans dimensions.
+
 ---
 
 ## Sécurité
@@ -275,7 +313,9 @@ ses couleurs ; il ne reste que le texte, le gras et l'italique.
 - `/api/save` et `/api/content` appellent `verifyAuth` avant toute autre chose.
 - Schéma Zod identique à celui du build, appliqué avant toute écriture.
 - Chemins d'écriture restreints à `src/content/pages/{langue}/{page}.json`.
-- Plafond de taille du contenu (100 Ko).
+- Plafond de taille du contenu (100 Ko), et de 20 Mo par fichier envoyé.
+- Formats d'image en liste blanche, reconnus aux octets ; nom de fichier réécrit
+  systématiquement, jamais repris de ce qu'annonce le navigateur.
 - Verrou optimiste : la version lue à l'ouverture est comparée avant d'écrire,
   et un écart renvoie un conflit au lieu d'écraser.
 - Messages d'erreur sans détail technique côté navigateur ; le détail va dans la
@@ -306,7 +346,7 @@ Ce qui reste à faire : limitation de débit sur `/api/save` et `/api/upload`
 
 ## Ce qui n'est pas encore là
 
-Médias et images (lot 3), listes et collections (lot 4), multilingue (lot 5).
+Listes et collections (lot 4), multilingue (lot 5).
 Les types correspondants existent déjà dans le schéma : le contenu qui les
 utilise sera validé, mais aucun composant ne les rend et aucun bouton ne les
 modifie.

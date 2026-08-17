@@ -65,6 +65,28 @@ export const OVERLAY_CSS = `
 }
 .cms-ui-swatch[aria-pressed="true"] { outline: 2px solid #0b5cff; outline-offset: 2px; }
 
+.cms-ui-panel {
+  position: absolute; z-index: 2147483300;
+  display: flex; flex-direction: column; gap: 12px; width: min(92vw, 380px);
+  padding: 16px; border-radius: 12px;
+  background: #fff; border: 1px solid #d0d5dd; color: #101828;
+  box-shadow: 0 10px 30px rgba(16,24,40,.22);
+  font-size: 14px;
+}
+.cms-ui-panel[hidden] { display: none; }
+.cms-ui-panel h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.cms-ui-field { display: flex; flex-direction: column; gap: 5px; }
+.cms-ui-field > span { color: #475467; font-size: 12px; }
+.cms-ui-field input[type="text"] {
+  border: 1px solid #d0d5dd; border-radius: 6px; padding: 8px 10px; font: inherit;
+}
+.cms-ui-field input[type="text"]:focus { outline: 2px solid #0b5cff; outline-offset: -1px; }
+.cms-ui-preview { width: 100%; height: auto; border-radius: 8px; border: 1px solid #e4e7ec; }
+.cms-ui-panel-status { margin: 0; color: #475467; font-size: 12px; line-height: 1.4; }
+.cms-ui-panel-status[data-tone="error"] { color: #b42318; }
+.cms-ui-on [data-cms-type="media"] { cursor: pointer; }
+.cms-ui-on [data-cms-type="media"]:hover { outline-color: #b3c8ff; }
+
 .cms-ui-blocker {
   position: fixed; inset: 0; z-index: 2147483600; display: none;
   align-items: center; justify-content: center; padding: 32px; text-align: center;
@@ -72,6 +94,6 @@ export const OVERLAY_CSS = `
 }
 @media (max-width: 767px) {
   .cms-ui-blocker { display: flex; }
-  .cms-ui-bar, .cms-ui-banner, .cms-ui-toolbar { display: none; }
+  .cms-ui-bar, .cms-ui-banner, .cms-ui-toolbar, .cms-ui-panel { display: none; }
 }
 `;

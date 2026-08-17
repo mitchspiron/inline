@@ -99,3 +99,33 @@ body {
 .hero > * + * {
   margin-top: var(--space-2);
 }
+
+.showcase {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.showcase img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.showcase figure {
+  margin: 0;
+}
+
+.showcase iframe {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  border: 0;
+  border-radius: 8px;
+}
+
+.showcase figcaption {
+  margin-top: var(--space-1);
+  color: var(--color-muted);
+  font-size: var(--size-sm);
+}

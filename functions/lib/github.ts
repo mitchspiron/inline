@@ -8,6 +8,7 @@
 import {
   GitError,
   fromBase64,
+  bytesToBase64,
   toBase64,
   type GitAuthor,
   type GitConfig,
@@ -68,7 +69,7 @@ export function createGitHubProvider(config: GitConfig): GitProvider {
 
     async writeFile(
       path: string,
-      content: string,
+      content: string | Uint8Array,
       version: string,
       message: string,
       author: GitAuthor,
@@ -78,8 +79,9 @@ export function createGitHubProvider(config: GitConfig): GitProvider {
         headers: { ...headers(), 'content-type': 'application/json' },
         body: JSON.stringify({
           message,
-          content: toBase64(content),
-          sha: version,
+          content: typeof content === 'string' ? toBase64(content) : bytesToBase64(content),
+          // Un fichier neuf n'a pas de version à faire correspondre.
+          ...(version ? { sha: version } : {}),
           branch: config.branch,
           committer: { name: author.name, email: author.email },
           author: { name: author.name, email: author.email },

@@ -12,6 +12,14 @@ export interface FieldEdit {
   value?: string;
   /** Tokens de style modifiés depuis la barre d'outils. */
   style?: Partial<StyleTokens>;
+  /**
+   * Propriétés d'un média modifiées : `src`, `alt`, dimensions, ou
+   * fournisseur et identifiant de vidéo.
+   *
+   * L'aperçu local (`blob:`) n'y figure jamais : il ne survit pas à la
+   * fermeture de l'onglet et n'aurait plus de sens à la réouverture.
+   */
+  media?: Record<string, string | number>;
 }
 
 export interface Draft {
