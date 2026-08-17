@@ -11,15 +11,13 @@
  * client. Rien ne doit indiquer à un attaquant s'il approche.
  */
 import { clearedCookies, createSession, sessionCookies } from '../lib/auth';
-import { checkRateLimit } from '../lib/rate-limit';
-import { json, type FunctionContext } from '../lib/guard';
-
-/** 5 tentatives par appelant par quart d'heure. */
-const LIMIT = 5;
-const WINDOW_SECONDS = 15 * 60;
+import { LIMITS, declaredBodyTooLarge, guardRate, json, type FunctionContext } from '../lib/guard';
 
 /** Une clé raisonnable ne dépasse pas cette taille ; au-delà, on ne calcule rien. */
 const MAX_KEY_LENGTH = 256;
+
+/** Le corps attendu tient en une ligne : une clé et rien d'autre. */
+const MAX_BODY = 2_000;
 
 function refusal(): Response {
   return json({ error: 'clé incorrecte' }, 401);
@@ -32,19 +30,11 @@ export function onRequest(): Response {
 export async function onRequestPost({ request, env }: FunctionContext): Promise<Response> {
   // Compté avant toute vérification : une tentative reste une tentative,
   // qu'elle soit bien formée ou non.
-  const rate = await checkRateLimit(request, env, {
-    bucket: 'auth',
-    limit: LIMIT,
-    windowSeconds: WINDOW_SECONDS,
-  });
+  const limited = await guardRate(request, env, LIMITS.auth);
+  if (limited) return limited;
 
-  if (!rate.allowed) {
-    return json(
-      { error: 'Trop de tentatives. Réessayez dans un quart d\'heure.' },
-      429,
-      { 'retry-after': String(WINDOW_SECONDS) },
-    );
-  }
+  // Un corps démesuré ne sert qu'à faire travailler la fonction pour rien.
+  if (declaredBodyTooLarge(request, MAX_BODY)) return refusal();
 
   let key = '';
   try {

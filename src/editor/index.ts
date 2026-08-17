@@ -220,6 +220,11 @@ function start(context: Context): void {
       if (result.status === 'too_large') {
         return { error: 'Cette image est trop lourde. Essayez-en une autre.' };
       }
+      if (result.status === 'busy') {
+        return {
+          error: 'Vous avez envoyé beaucoup d\'images coup sur coup. Patientez quelques minutes, puis réessayez.',
+        };
+      }
       if (result.status === 'rejected') {
         return {
           error:
@@ -892,6 +897,15 @@ function start(context: Context): void {
         text: "Cette page a été modifiée ailleurs depuis que vous l'avez ouverte. Rechargez-la pour repartir de la dernière version : vos modifications sont conservées.",
         tone: 'error',
         actions: [{ label: 'Recharger la page', onClick: () => window.location.reload() }],
+      });
+      return;
+    }
+
+    if (result.status === 'busy') {
+      ui.showBanner({
+        text: 'Vous avez publié beaucoup de fois coup sur coup. Patientez quelques minutes, puis réessayez : vos modifications sont conservées.',
+        tone: 'error',
+        actions: [{ label: 'Fermer', onClick: () => ui.clearBanner() }],
       });
       return;
     }

@@ -40,9 +40,9 @@ Ces règles priment sur toute autre considération. En cas de doute, demander pl
   /components             Composants .astro — statiques par défaut
   /layouts
   /editor                 Overlay d'édition (TypeScript vanilla)
+  /media                  Images téléversées — dans src/, pour qu'`<Image />` les traite au build
   /styles                 Tokens de thème
   /pages/[lang]/[...slug].astro
-/public/media
 /functions
   /lib/auth.ts            verifyAuth / createSession
   /lib/git-provider.ts    Abstraction GitHub / GitLab
@@ -52,6 +52,8 @@ Ces règles priment sur toute autre considération. En cas de doute, demander pl
 /scripts
   check-html.mjs          CI : vérifie que le contenu est dans le HTML brut
   check-locales.mjs       CI : parité des clés entre locales
+  check-logs.mjs          CI : aucun secret dans un appel à console.*
+  check-secrets.mjs       CI : aucun secret dans le dossier de build
 ```
 
 **Flux de lecture** : JSON → Astro → HTML statique sur CDN. Aucun appel réseau à l'exécution.

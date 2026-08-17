@@ -2,17 +2,17 @@
  * POST /api/save → { version }
  *
  * Enchaînement, dans cet ordre, sans raccourci :
- *   1. la route est-elle ouverte ;
- *   2. le corps est-il de la bonne forme et sous le plafond de taille ;
- *   3. le chemin est-il dans la liste blanche ;
- *   4. le contenu passe-t-il le MÊME schéma Zod que le build ;
- *   5. la version détenue par l'éditeur est-elle toujours celle du dépôt ;
- *   6. écriture, attribuée à l'auteur.
+ *   1. l'appelant n'a-t-il pas dépassé son débit ;
+ *   2. la route est-elle ouverte ;
+ *   3. le corps est-il de la bonne forme et sous le plafond de taille ;
+ *   4. le chemin est-il dans la liste blanche ;
+ *   5. le contenu passe-t-il le MÊME schéma Zod que le build ;
+ *   6. la version détenue par l'éditeur est-elle toujours celle du dépôt ;
+ *   7. écriture, attribuée à l'auteur.
  *
  * La validation côté overlay ne compte pour rien ici : tout est revérifié.
  *
  * L'identité n'est jamais évaluée ici : `verifyAuth` en est le seul juge.
- * TODO lot 6 — limitation de débit.
  */
 import { pageSchema } from '../../src/content/schema';
 import { verifyAuth } from '../lib/auth';
@@ -20,7 +20,12 @@ import { sanitizeRichtext, sanitizeText } from '../lib/sanitize';
 import { isValidVideoReference } from '../../src/lib/video';
 import { createGitProvider, GitError } from '../lib/git-provider';
 import {
+  LIMITS,
+  MAX_BODY_BYTES,
   MAX_CONTENT_BYTES,
+  declaredBodyTooLarge,
+  guardRate,
+  isAllowedMediaFile,
   isAllowedPath,
   json,
   resolveAuthor,
@@ -57,9 +62,6 @@ function sanitizeFields(node: unknown): void {
   for (const child of Object.values(record)) sanitizeFields(child);
 }
 
-/** Un nom de fichier média, et rien qui puisse servir à sortir du dossier. */
-const MEDIA_FILE = /^[a-z0-9]+(?:-[a-z0-9]+)*\.(jpg|png|webp)$/;
-
 /**
  * Contrôles que le schéma ne peut pas exprimer.
  *
@@ -73,7 +75,7 @@ function mediaIsValid(node: unknown): boolean {
   const record = node as Record<string, unknown>;
   if (record.type === 'media') {
     if (record.kind === 'image') {
-      return typeof record.src === 'string' && MEDIA_FILE.test(record.src);
+      return isAllowedMediaFile(record.src);
     }
     if (record.kind === 'video') {
       return isValidVideoReference(String(record.provider), String(record.videoId));
@@ -116,11 +118,27 @@ function containsAttack(node: unknown): boolean {
   return Object.values(node as Record<string, unknown>).some(containsAttack);
 }
 
-/** Message de commit : préfixe imposé, corps borné, jamais recopié tel quel. */
-function sanitizeMessage(message: unknown, path: string): string {
+/**
+ * Message de publication : borné, sur une seule ligne, jamais recopié tel quel.
+ *
+ * Un retour à la ligne y séparerait le titre du corps, et une suite de lignes
+ * bien choisies laisserait un appelant écrire ce qu'il veut dans l'historique
+ * du dépôt. Exporté pour être mis à l'épreuve directement.
+ */
+export function sanitizeMessage(message: unknown, path: string): string {
   const fallback = `content: ${path}`;
   if (typeof message !== 'string') return fallback;
-  const cleaned = message.replace(/[\r\n]+/g, ' ').trim().slice(0, 120);
+
+  // Caractères de contrôle et de formatage confondus : pas seulement les
+  // retours à la ligne, mais aussi les séparateurs Unicode et les marques
+  // d'inversion de sens d'écriture, qui permettent d'afficher autre chose que
+  // ce qui est écrit.
+  const cleaned = message
+    .replace(/[\p{Cc}\p{Cf}\u2028\u2029]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120);
+
   return cleaned.length > 0 ? cleaned : fallback;
 }
 
@@ -130,14 +148,34 @@ export function onRequest(): Response {
 }
 
 export async function onRequestPost({ request, env }: FunctionContext): Promise<Response> {
+  // Avant l'identité : refuser un appelant qui insiste ne demande pas de
+  // savoir qui il est, et une session volée ne doit pas pouvoir marteler
+  // l'API du dépôt.
+  const limited = await guardRate(request, env, LIMITS.save);
+  if (limited) return limited;
+
+  if (declaredBodyTooLarge(request, MAX_BODY_BYTES)) {
+    return json({ error: 'too_large' }, 413);
+  }
+
   if (!(await verifyAuth(request, env))) {
     return json({ error: 'unauthorized' }, 401);
   }
 
+  // Lu en texte pour mesurer ce qui est réellement arrivé : l'en-tête de
+  // taille peut mentir ou manquer, les octets non.
+  const raw = await request.text();
+  if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) {
+    return json({ error: 'too_large' }, 413);
+  }
+
   let payload: Partial<SavePayload>;
   try {
-    payload = (await request.json()) as Partial<SavePayload>;
+    payload = JSON.parse(raw) as Partial<SavePayload>;
   } catch {
+    return json({ error: 'bad_request' }, 400);
+  }
+  if (payload == null || typeof payload !== 'object' || Array.isArray(payload)) {
     return json({ error: 'bad_request' }, 400);
   }
 
@@ -145,6 +183,9 @@ export async function onRequestPost({ request, env }: FunctionContext): Promise<
     return json({ error: 'bad_request' }, 400);
   }
   if (typeof payload.content !== 'string' || typeof payload.version !== 'string') {
+    return json({ error: 'bad_request' }, 400);
+  }
+  if (payload.version.length > 200) {
     return json({ error: 'bad_request' }, 400);
   }
   if (new TextEncoder().encode(payload.content).length > MAX_CONTENT_BYTES) {
@@ -187,7 +228,13 @@ export async function onRequestPost({ request, env }: FunctionContext): Promise<
 
   const validation = pageSchema.safeParse(parsed);
   if (!validation.success) {
-    console.error('[save] contenu refusé par le schéma', validation.error.issues.slice(0, 5));
+    // On journalise *où* et *pourquoi*, jamais la valeur reçue : les rapports
+    // de Zod embarquent le contenu fautif, qui n'a rien à faire dans un
+    // journal d'hébergeur.
+    const where = validation.error.issues
+      .slice(0, 5)
+      .map((issue) => `${issue.path.join('.') || '(racine)'}: ${issue.code}`);
+    console.error('[save] contenu refusé par le schéma', where);
     return json({ error: 'invalid_content' }, 422);
   }
 

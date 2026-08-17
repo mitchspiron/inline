@@ -7,7 +7,7 @@
  */
 import { verifyAuth } from '../lib/auth';
 import { createGitProvider, GitError } from '../lib/git-provider';
-import { isAllowedPath, json, type FunctionContext } from '../lib/guard';
+import { LIMITS, guardRate, isAllowedPath, json, type FunctionContext } from '../lib/guard';
 
 /** Toute autre méthode est refusée explicitement. */
 export function onRequest(): Response {
@@ -15,6 +15,11 @@ export function onRequest(): Response {
 }
 
 export async function onRequestGet({ request, env }: FunctionContext): Promise<Response> {
+  // Chaque lecture consomme le quota de l'API du dépôt : on borne, même pour
+  // une session valide.
+  const limited = await guardRate(request, env, LIMITS.content);
+  if (limited) return limited;
+
   if (!(await verifyAuth(request, env))) {
     return json({ error: 'unauthorized' }, 401);
   }

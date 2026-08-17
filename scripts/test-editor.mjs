@@ -223,6 +223,36 @@ check(
   third.storage.has(`cms:draft:${FILE}`),
 );
 
+// --- Débit dépassé --------------------------------------------------------------
+const busy = await openPage();
+const busyTitle = busy.document.querySelector('[data-cms="blocks.hero.title"]');
+busyTitle.dispatchEvent(new busy.window.MouseEvent('click', { bubbles: true }));
+type(busy.window, busyTitle, 'Une publication de trop');
+await new Promise((resolve) => setTimeout(resolve, 350));
+busy.window.fetch = async (url) => {
+  if (String(url).startsWith('/api/content')) {
+    return new Response(JSON.stringify({ content: repoContent, version: 'v1' }), { status: 200 });
+  }
+  return new Response(JSON.stringify({ error: 'Trop de demandes coup sur coup.' }), { status: 429 });
+};
+buttonByText(busy.document, 'Publier').click();
+await new Promise((resolve) => setTimeout(resolve, 50));
+
+const busyBanner = busy.document.querySelector('.cms-ui-banner');
+check(
+  'un débit dépassé invite à patienter, sans jargon ni compteur',
+  !!busyBanner &&
+    /patientez/i.test(busyBanner.textContent) &&
+    !/(429|limit|débit|tentative|serveur|adresse)/i.test(busyBanner.textContent),
+  busyBanner?.textContent,
+);
+check(
+  'et rassure sur le sort des modifications',
+  /conserv/i.test(busyBanner?.textContent ?? ''),
+  busyBanner?.textContent,
+);
+check('le brouillon est conservé', busy.storage.has(`cms:draft:${FILE}`));
+
 // --- Barre d'outils : seulement les variantes du schéma ------------------------
 console.log('\nBarre d\'outils');
 

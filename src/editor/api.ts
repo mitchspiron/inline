@@ -20,6 +20,8 @@ export type PublishResult =
   | { status: 'expired' }
   /** Contenu refusé par la validation serveur. */
   | { status: 'rejected' }
+  /** Trop de publications coup sur coup : il faut laisser passer un moment. */
+  | { status: 'busy' }
   /** Réseau, service indisponible, cause inconnue. */
   | { status: 'failed' };
 
@@ -68,6 +70,7 @@ export async function publish(payload: {
 
   if (response.status === 401) return { status: 'expired' };
   if (response.status === 409) return { status: 'conflict' };
+  if (response.status === 429) return { status: 'busy' };
   if (response.status === 400 || response.status === 422) return { status: 'rejected' };
   return { status: 'failed' };
 }
@@ -77,6 +80,7 @@ export type UploadResult =
   | { status: 'expired' }
   | { status: 'rejected'; kind: string }
   | { status: 'too_large' }
+  | { status: 'busy' }
   | { status: 'failed' };
 
 /**
@@ -107,6 +111,7 @@ export async function uploadImage(blob: Blob, fileName: string): Promise<UploadR
 
   if (response.status === 401) return { status: 'expired' };
   if (response.status === 413) return { status: 'too_large' };
+  if (response.status === 429) return { status: 'busy' };
   if (response.status === 415) {
     let kind = 'unknown';
     try {

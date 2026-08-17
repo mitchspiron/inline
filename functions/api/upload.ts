@@ -6,9 +6,8 @@
  * et le jeu de largeurs.
  *
  * Rien de ce que déclare l'appelant n'est cru : le type est reconnu aux octets,
- * les dimensions sont lues dans l'en-tête du fichier, le nom est réécrit.
- *
- * TODO lot 6 — limitation de débit.
+ * les dimensions sont lues dans l'en-tête du fichier, le nom est réécrit — et
+ * le nom réécrit est lui-même revérifié avant d'atteindre le dépôt.
  */
 import { verifyAuth } from '../lib/auth';
 import { createGitProvider, GitError } from '../lib/git-provider';
@@ -19,10 +18,16 @@ import {
   normalizeFileName,
   uniqueFileName,
 } from '../lib/image';
-import { json, resolveAuthor, type FunctionContext } from '../lib/guard';
-
-/** Les fichiers vivent ici pour que `<Image />` puisse les traiter au build. */
-const MEDIA_DIRECTORY = 'src/media';
+import {
+  LIMITS,
+  MEDIA_DIRECTORY,
+  declaredBodyTooLarge,
+  guardRate,
+  isAllowedMediaFile,
+  json,
+  resolveAuthor,
+  type FunctionContext,
+} from '../lib/guard';
 
 /** Toute autre méthode est refusée explicitement. */
 export function onRequest(): Response {
@@ -30,6 +35,15 @@ export function onRequest(): Response {
 }
 
 export async function onRequestPost({ request, env }: FunctionContext): Promise<Response> {
+  const limited = await guardRate(request, env, LIMITS.upload);
+  if (limited) return limited;
+
+  // Refusé sur la taille annoncée : inutile de mettre 200 Mo en mémoire pour
+  // découvrir ensuite qu'ils dépassent le plafond.
+  if (declaredBodyTooLarge(request, MAX_UPLOAD_BYTES)) {
+    return json({ error: 'too_large' }, 413);
+  }
+
   if (!(await verifyAuth(request, env))) {
     return json({ error: 'unauthorized' }, 401);
   }
@@ -62,7 +76,8 @@ export async function onRequestPost({ request, env }: FunctionContext): Promise<
     return json({ error: 'unsupported_format', kind: 'dimensions' }, 415);
   }
 
-  const requested = typeof form.get('name') === 'string' ? String(form.get('name')) : 'image';
+  const submitted = form.get('name');
+  const requested = typeof submitted === 'string' ? submitted.slice(0, 200) : 'image';
   const baseName = normalizeFileName(requested, info.format);
 
   try {
@@ -84,6 +99,14 @@ export async function onRequestPost({ request, env }: FunctionContext): Promise<
         if (error instanceof GitError && error.code === 'not_found') break;
         throw error;
       }
+    }
+
+    // Dernier verrou avant le dépôt : le nom réécrit doit passer la même
+    // liste blanche que celle imposée aux références dans le contenu. Si la
+    // réécriture laissait un jour passer autre chose, l'écriture s'arrête ici.
+    if (!isAllowedMediaFile(finalName)) {
+      console.error('[upload] nom de fichier refusé après réécriture');
+      return json({ error: 'bad_request' }, 400);
     }
 
     await provider.writeFile(

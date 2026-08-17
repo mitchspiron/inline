@@ -1,0 +1,50 @@
+# Contrôles automatiques, sur chaque poussée et chaque proposition de fusion.
+#
+# Ce n'est pas un décor : ce sont les mêmes commandes que celles à lancer avant
+# de commiter, et elles décident du sort de la branche. Un contrôle qui ne
+# bloque pas se contourne, puis se désactive, puis disparaît.
+#
+# Aucun secret n'est nécessaire ici. Les contrôles ne touchent ni au dépôt de
+# contenu ni au jeton d'écriture : ils construisent le site et l'inspectent.
+
+name: Contrôles
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Une poussée qui en remplace une autre annule la précédente : inutile de
+# vérifier un état déjà dépassé.
+concurrency:
+  group: controles-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      # Construit le site au passage : les contrôles suivants inspectent
+      # « dist/ », donc ils ont besoin d'un build à jour.
+      - name: Tests
+        run: npm test
+
+      # Contenu dans le HTML brut, parité des langues, journaux sans secret,
+      # aucun secret dans le build.
+      - name: Contrôles du site construit
+        run: npm run check

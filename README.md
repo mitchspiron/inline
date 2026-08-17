@@ -9,9 +9,9 @@ Le client reçoit une URL, `monsite.fr/admin`, et une clé. Il entre, il modifie
 ses textes sur ses propres pages, il publie. Chaque publication est un commit ;
 le site se reconstruit dans la minute.
 
-**État : lots 0 à 5 livrés.** Textes, richtext, images, vidéos, listes et
-multilingue. Reste le durcissement et l'industrialisation — voir *Ce qui n'est
-pas encore là*.
+**État : lots 0 à 6 livrés.** Textes, richtext, images, vidéos, listes,
+multilingue et durcissement. Reste l'industrialisation — voir *Ce qui n'est pas
+encore là*.
 
 ---
 
@@ -79,8 +79,8 @@ d'autre.
 npm run dev              # Serveur Astro seul — le site, sans les fonctions ni l'édition
 npm run build            # Build de production (échoue si le contenu est invalide)
 npm run serve:functions  # Site + fonctions : c'est ici qu'on édite en local
-npm run check            # Contenu dans le HTML brut + parité des langues + aucun secret
-npm run test             # Git, authentification, assainissement, médias, HEIC, langues, overlay
+npm run check            # HTML brut + parité des langues + journaux + aucun secret
+npm run test             # Git, authentification, durcissement, assainissement, médias, HEIC, langues, overlay
 npm run make:key         # Génère une clé de site, son empreinte, un secret de session
 npm run mock:git         # Faux service Git local, pour essayer sans dépôt
 ```
@@ -88,6 +88,11 @@ npm run mock:git         # Faux service Git local, pour essayer sans dépôt
 `npm run check` doit passer avant tout commit. Il échoue si une valeur du JSON
 n'est pas dans le HTML servi — c'est le filet contre une hydratation posée par
 réflexe, qui sortirait le contenu de l'index des moteurs et des assistants.
+
+Ces deux commandes sont exactement celles que lance l'intégration continue
+([.github/workflows/ci.yml](.github/workflows/ci.yml)) sur chaque poussée et
+chaque proposition de fusion. Elles bloquent la branche : un contrôle qui ne
+bloque pas se contourne, puis se désactive, puis disparaît.
 
 ---
 
@@ -191,10 +196,11 @@ sur les autres plateformes en adaptant la signature des handlers.
 
 ### La liaison `RATE_LIMIT`
 
-Le comptage des tentatives de clé a besoin d'un état partagé entre les
-instances de la fonction. Sans la liaison, `inline` retombe sur un compteur en
-mémoire : suffisant en local, **insuffisant en production**, où chaque instance
-compterait pour elle seule.
+Le comptage des appels — tentatives de clé, publications, envois d'images — a
+besoin d'un état partagé entre les instances de la fonction. Sans la liaison,
+`inline` retombe sur un compteur en mémoire : suffisant en local,
+**insuffisant en production**, où chaque instance compterait pour elle seule et
+où un démarrage à froid remettrait tout à zéro.
 
 Les espaces clé-valeur des hébergeurs sont à cohérence différée : la protection
 reste efficace contre une force brute — qui suppose des milliers d'essais —
@@ -408,14 +414,24 @@ serait servi tel quel, sans AVIF, sans jeu de largeurs, sans dimensions.
 
 - Clé de site hachée en argon2id, jamais stockée en clair, jamais comparée dans
   le navigateur, jamais servie.
-- 5 tentatives par appelant par quart d'heure sur `/api/auth`.
+- Débit borné sur **toutes** les routes, par appelant — voir le tableau
+  ci-dessous.
 - Message d'erreur unique — « clé incorrecte » — quelle que soit la cause.
 - Session de 8 h portée par un cookie `HttpOnly`, `Secure`, `SameSite=Strict`,
   signé en HMAC-SHA256.
-- `/api/save` et `/api/content` appellent `verifyAuth` avant toute autre chose.
+- `/api/save`, `/api/upload` et `/api/content` appellent `verifyAuth` avant
+  d'approcher le dépôt.
 - Schéma Zod identique à celui du build, appliqué avant toute écriture.
 - Chemins d'écriture restreints à `src/content/pages/{langue}/{page}.json`.
-- Plafond de taille du contenu (100 Ko), et de 20 Mo par fichier envoyé.
+- Chemins de médias restreints à un nom en minuscules sans accent — la **même**
+  liste blanche décide de ce que `/api/upload` écrit et de ce que `/api/save`
+  accepte de voir référencé.
+- Plafond de taille du contenu (100 Ko), de l'enveloppe complète (128 Ko), et de
+  20 Mo par fichier envoyé. Le plafond est appliqué sur les octets reçus, pas
+  seulement sur la taille annoncée.
+- Message de publication réduit à une seule ligne : ni retour à la ligne, ni
+  séparateur Unicode, ni marque d'inversion d'écriture ne peuvent servir à
+  composer un historique trompeur.
 - Formats d'image en liste blanche, reconnus aux octets ; nom de fichier réécrit
   systématiquement, jamais repris de ce qu'annonce le navigateur.
 - Verrou optimiste : la version lue à l'ouverture est comparée avant d'écrire,
@@ -441,18 +457,56 @@ résultat. `npm run test:sanitize` soumet le même corpus aux deux
 implémentations et compare les sorties — c'est ce test qui garantit qu'elles ne
 divergent pas.
 
-Ce qui reste à faire : limitation de débit sur `/api/save` et `/api/upload`
-(lot 6).
+### L'ordre des contrôles
+
+Chaque route refuse dans cet ordre, et l'ordre compte autant que les règles :
+
+1. **débit** — refuser un appelant qui insiste ne demande pas de savoir qui il
+   est, et une session volée ne doit pas pouvoir marteler l'API du dépôt ;
+2. **taille annoncée** — inutile de mettre 200 Mo en mémoire pour découvrir
+   ensuite qu'ils dépassent le plafond ;
+3. **identité** ;
+4. **taille reçue**, puis forme, chemin, schéma, verrou, écriture.
+
+Un plafond de taille placé après la lecture du corps ne protège de rien. C'est
+pour cela que [scripts/test-guard.mjs](scripts/test-guard.mjs) appelle les
+routes directement plutôt que de se contenter de tester les règles isolément :
+c'est le seul moyen de vérifier l'ordre.
+
+| Route | Budget | Ce qu'il protège |
+|---|---|---|
+| `/api/auth` | 5 par quart d'heure | la clé du site |
+| `/api/content` | 60 par 5 minutes | le quota de l'API Git |
+| `/api/save` | 30 par 5 minutes | le dépôt, le quota |
+| `/api/upload` | 30 par quart d'heure | le dépôt, le quota |
+
+Seul le premier protège un secret. Les autres sont larges : un humain qui édite
+sa page ne les approche jamais.
+
+### Journaux
+
+`npm run check` refuse un `console.*` qui évaluerait un jeton, une empreinte,
+un cookie, une session, ou un objet qui les contient (`env`, `headers`,
+`payload`). Les chaînes de caractères sont retirées avant l'analyse : un
+message en français parlant de « clé » n'est pas une fuite, `console.error(key)`
+en est une.
+
+C'est une règle qu'on respecte spontanément le jour où on l'écrit, et qu'on
+enfreint six mois plus tard en ajoutant un `console.error(error)` pour
+déboguer. [scripts/check-logs.mjs](scripts/check-logs.mjs) est là pour ce
+jour-là.
 
 ---
 
 ## Ce qui n'est pas encore là
 
-Durcissement (lot 6), industrialisation (lot 7).
-Les types correspondants existent déjà dans le schéma : le contenu qui les
-utilise sera validé, mais aucun composant ne les rend et aucun bouton ne les
-modifie.
+Industrialisation (lot 7) : dépôt modèle, overlay partagé et versionné, script
+de création de site, amorçage d'un site existant.
 
-Deux fichiers manquent, faute d'objet à ce stade : `check-locales.mjs` (une
-seule locale) et l'implémentation GitLab — [gitlab.ts](functions/lib/gitlab.ts)
-porte la signature et les six points à connaître avant de l'écrire.
+L'implémentation GitLab reste à écrire — [gitlab.ts](functions/lib/gitlab.ts)
+porte la signature et les six points à connaître avant de s'y mettre.
+
+Le comptage de débit s'appuie sur un espace clé-valeur à cohérence différée : il
+arrête une force brute, qui suppose des milliers d'essais, mais n'est pas exact
+à l'unité. Pour un comptage strict, implémenter `RateLimitStore` sur un
+stockage fortement cohérent.
