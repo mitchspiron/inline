@@ -1,5 +1,5 @@
 {
-  "name": "cms-front-lot0",
+  "name": "inline",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -26,5 +26,6 @@
     "esbuild": "^0.28.2",
     "jsdom": "^29.1.1",
     "wrangler": "^3.107.2"
-  }
+  },
+  "description": "Edition de contenu en front pour sites statiques."
 }

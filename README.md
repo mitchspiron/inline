@@ -1,4 +1,11 @@
-# Édition en front pour site statique — lot 0
+# inline
+
+Édition de contenu en front pour sites statiques. Le contenu vit dans des
+fichiers JSON validés par Zod, il est injecté dans le HTML au moment du build,
+et une interface d'édition superposée permet de le modifier directement sur la
+page — sans CMS, sans serveur applicatif.
+
+## Lot 0 — preuve de chaîne
 
 Preuve de chaîne de bout en bout, sur le périmètre le plus petit possible :
 **une page, une langue, du texte seul → édition dans la page → publication →
