@@ -8,7 +8,7 @@
  *
  * Vidéo : un champ où coller un lien. Aucun fichier n'est jamais téléversé.
  */
-import { parseVideoUrl, embedUrl, type VideoReference } from '../lib/video';
+import { parseVideoUrl, embedUrl, type VideoReference } from '../video';
 import { decodeHeic, looksLikeHeic } from './heic';
 
 /** Au-delà, on ne gagne plus rien de visible et on alourdit le dépôt. */

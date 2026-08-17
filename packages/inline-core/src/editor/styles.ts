@@ -25,6 +25,8 @@ export const OVERLAY_CSS = `
 .cms-ui-pending { color: #fdb022; white-space: nowrap; }
 .cms-ui-on [data-cms-untranslated=true] { outline-color: #fdb022 !important; }
 .cms-ui-status[data-dirty="true"] { opacity: 1; font-weight: 600; }
+.cms-ui-help { color: #98a2b3; text-decoration: underline; white-space: nowrap; }
+.cms-ui-help:hover { color: #fff; }
 .cms-ui-btn {
   border: 0; border-radius: 8px; padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer;
   background: #0b5cff; color: #fff;

@@ -1,5 +1,6 @@
 ---
-import '../styles/tokens.css';
+import 'inline-core/styles/tokens.css';
+import '../styles/theme.css';
 import { site } from '../content/site';
 
 // Une seule chose à faire sur cette page : entrer. Pas de tableau de bord,
@@ -37,6 +38,7 @@ import { site } from '../content/site';
       </form>
 
       <p class="admin-help">
+        Première fois ? <a href="/aide">Voir comment modifier votre site</a>.<br />
         Clé perdue ou plus valable ? Contactez-nous à
         <a href={`mailto:${site.contact.email}`}>{site.contact.email}</a>.
       </p>

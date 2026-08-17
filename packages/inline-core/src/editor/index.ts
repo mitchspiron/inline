@@ -21,8 +21,7 @@ import {
   nextId,
   type ListZone,
 } from './collection';
-import { embedUrl } from '../lib/video';
-import { LOCALE_LABELS } from '../lib/locales';
+import { embedUrl } from '../video';
 import { loadSanitizer, sanitizeRichtext, sanitizeText } from './sanitize';
 import { createToolbar, type RichCommand, type StyleChange } from './toolbar';
 import {
@@ -32,7 +31,7 @@ import {
   WEIGHTS,
   styleClasses,
   type StyleTokens,
-} from '../lib/style-tokens';
+} from '../style-tokens';
 
 interface Context {
   file: string;
@@ -143,21 +142,24 @@ function start(context: Context): void {
   let active: Zone | null = null;
 
   /**
-   * Les langues déclarées par la page. L'overlay ne les devine pas : il lit ce
-   * que le build a posé, donc exactement les URL qui existent.
+   * Les langues déclarées par la page. L'overlay ne les devine pas et ne les
+   * connaît pas : quelles langues existent, comment elles s'appellent et à
+   * quelle adresse elles répondent sont des décisions du site. Il lit ce que
+   * le build a posé, donc exactement les pages qui existent.
    */
-  const localeLinks = (document.body.dataset.cmsLocales ?? '')
-    .split(',')
-    .filter(Boolean)
-    .map((entry) => {
-      const [code, href] = entry.split(':');
-      return {
-        locale: code,
-        href,
-        label: LOCALE_LABELS[code as keyof typeof LOCALE_LABELS] ?? code,
-        current: code === context.locale,
-      };
-    });
+  let declared: Array<{ locale: string; href: string; label: string }> = [];
+  try {
+    declared = JSON.parse(document.body.dataset.cmsLocales ?? '[]');
+  } catch {
+    console.warn('[editor] langues de la page illisibles');
+  }
+
+  const localeLinks = declared.map((entry) => ({
+    locale: entry.locale,
+    href: entry.href,
+    label: entry.label || entry.locale,
+    current: entry.locale === context.locale,
+  }));
 
   const ui: Ui = mountUi({
     onPublish: doPublish,

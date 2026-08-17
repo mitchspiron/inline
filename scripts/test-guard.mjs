@@ -42,7 +42,13 @@ async function load(entry) {
   return import(pathToFileURL(outfile).href);
 }
 
-const guard = await load('functions/lib/guard.ts');
+const guard = await load('packages/inline-core/src/server/guard.ts');
+
+/**
+ * Les langues sont une décision du site, pas du paquet : elles arrivent en
+ * paramètre. Un site monolingue en déclare une seule.
+ */
+const LOCALES = ['fr', 'en'];
 
 // --- Chemins ouverts en écriture -----------------------------------------------
 console.log('\nChemins ouverts en écriture');
@@ -52,7 +58,7 @@ for (const path of [
   'src/content/pages/en/home.json',
   'src/content/pages/fr/mentions-legales.json',
 ]) {
-  check(`« ${path} » est accepté`, guard.isAllowedPath(path));
+  check(`« ${path} » est accepté`, guard.isAllowedPath(path, LOCALES));
 }
 
 for (const [label, path] of [
@@ -79,18 +85,18 @@ for (const [label, path] of [
   ['un objet', { toString: () => 'src/content/pages/fr/home.json' }],
   ['une valeur absente', undefined],
 ]) {
-  check(`${label} : refusé`, !guard.isAllowedPath(path));
+  check(`${label} : refusé`, !guard.isAllowedPath(path, LOCALES));
 }
 
 // Le segment de langue est restreint aux langues déclarées : autrement, une
 // écriture créerait un dossier que rien ne construit.
 check(
   'une langue non déclarée est refusée',
-  !guard.isAllowedPath('src/content/pages/de/home.json'),
+  !guard.isAllowedPath('src/content/pages/de/home.json', LOCALES),
 );
 check(
   'un code de langue trop long est refusé',
-  !guard.isAllowedPath('src/content/pages/fra/home.json'),
+  !guard.isAllowedPath('src/content/pages/fra/home.json', LOCALES),
 );
 
 // --- Noms de médias -------------------------------------------------------------
@@ -185,9 +191,15 @@ check(
 // --- Routes : l'ordre des contrôles ---------------------------------------------
 console.log('\nRoutes');
 
-const save = await load('functions/api/save.ts');
-const upload = await load('functions/api/upload.ts');
-const content = await load('functions/api/content.ts');
+const saveModule = await load('packages/inline-core/src/server/routes/save.ts');
+const uploadModule = await load('packages/inline-core/src/server/routes/upload.ts');
+const contentModule = await load('packages/inline-core/src/server/routes/content.ts');
+
+// Les routes se construisent avec la configuration du site — c'est tout ce
+// qu'un site a à dire au paquet.
+const save = { ...saveModule.createSaveRoute({ locales: LOCALES }), sanitizeMessage: saveModule.sanitizeMessage };
+const upload = uploadModule.createUploadRoute();
+const content = contentModule.createContentRoute({ locales: LOCALES });
 
 check('une méthode inattendue est refusée sur la publication', save.onRequest().status === 405);
 check('une méthode inattendue est refusée sur l\'envoi d\'image', upload.onRequest().status === 405);

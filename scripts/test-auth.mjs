@@ -4,7 +4,7 @@
  *
  *   node scripts/test-auth.mjs
  *
- * Aucun appel réseau, aucun serveur : on charge les modules de /functions/lib
+ * Aucun appel réseau, aucun serveur : on charge les modules serveur du paquet
  * et on les met à l'épreuve directement.
  */
 import { build } from 'esbuild';
@@ -59,7 +59,7 @@ const requestWith = (cookie) =>
 
 // --- Authentification --------------------------------------------------------
 
-const auth = await load('functions/lib/auth.ts');
+const auth = await load('packages/inline-core/src/server/auth.ts');
 const { verifyKey, createSession, verifyAuth, sessionCookies, clearedCookies, COOKIE_NAMES } =
   auth.module;
 
@@ -138,7 +138,7 @@ await auth.cleanup();
 
 // --- Limitation de débit -----------------------------------------------------
 
-const limiter = await load('functions/lib/rate-limit.ts');
+const limiter = await load('packages/inline-core/src/server/rate-limit.ts');
 const { checkRateLimit, clientIdentifier, createMemoryStore } = limiter.module;
 
 console.log('\nLimitation de débit');

@@ -20,7 +20,7 @@
  * ──────────────────────────────────────────────────────────────────────────
  */
 import { Parser } from 'htmlparser2';
-import { isSafeHref } from '../../src/lib/safe-href';
+import { isSafeHref } from '../safe-href';
 
 export { isSafeHref };
 

@@ -20,7 +20,7 @@ import {
   type Size,
   type StyleTokens,
   type Weight,
-} from '../lib/style-tokens';
+} from '../style-tokens';
 
 /** Libellés en langage courant. Aucun nom de token n'apparaît à l'écran. */
 const LABELS: Record<string, string> = {

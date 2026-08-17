@@ -19,7 +19,7 @@ Ces règles priment sur toute autre considération. En cas de doute, demander pl
 3. **Le token Git ne quitte jamais le serveur.** Il appartient à l'agence, pas au client. Aucun code ne doit le placer dans une réponse, un fichier servi, `localStorage` ou `sessionStorage`.
 3 bis. **La clé de site est vérifiée exclusivement côté serveur.** Ne jamais servir `EDITOR_KEY_HASH` au navigateur, ne jamais comparer la clé en JavaScript client. Un hash exposé est attaquable hors ligne.
 4. **Aucun secret dans le dépôt.** Tokens et clés vivent exclusivement en variables d'environnement de la fonction serveur — l'hébergeur n'est pas tranché, aucun code ne doit en dépendre.
-5. **Aucun style libre.** Les styles éditables passent uniquement par les enums Zod de `src/content/config.ts`. Pas d'hexadécimal, pas de pixels dans le JSON de contenu.
+5. **Aucun style libre.** Les styles éditables passent uniquement par les enums Zod de `inline-core/style-tokens`. Pas d'hexadécimal, pas de pixels dans le JSON de contenu.
 6. **Ne pas utiliser `src/pages/api/*`.** En sortie statique, ces endpoints s'exécutent au build et non à la requête. Toute route dynamique va dans `/functions`.
 7. **Toute écriture est validée côté serveur** : identité, schéma Zod, chemin en liste blanche, taille, assainissement. Ne jamais se reposer sur la validation client.
 8. **Aucun jargon technique dans l'interface d'édition.** Le client est non technique et ne verra jamais le code. « Publier » et non « Commit », « Description de l'image » et non « alt », « Annuler mes modifications » et non « Revert ». Le mot Git, le SHA, le JSON et le nom du dépôt ne doivent apparaître nulle part à l'écran.
@@ -31,30 +31,48 @@ Ces règles priment sur toute autre considération. En cas de doute, demander pl
 
 ## Architecture
 
+Le dépôt est séparé en deux. **Ce qui est identique d'un client à l'autre est partagé et versionné ; ce qui lui appartient est copié puis adapté.** Un correctif de sécurité doit atteindre les dix sites en changeant un numéro de version, pas en dix modifications à retrouver.
+
+**Partagé — `packages/inline-core`, versionné (voir son CHANGELOG)**
+```
+src/schema.ts             Schémas Zod — source de vérité du modèle
+src/style-tokens.ts       Variantes autorisées, source unique
+src/safe-href.ts          Ce qu'est un lien sûr, des deux côtés
+src/video.ts              Lecture d'une adresse YouTube / Vimeo
+src/translate.ts          Repli de traduction (pas la liste des langues)
+src/editor/               Overlay d'édition (TypeScript vanilla)
+src/server/auth.ts        verifyAuth / createSession
+src/server/guard.ts       Débit, plafonds, chemins autorisés
+src/server/git-provider.ts    Abstraction GitHub / GitLab
+src/server/routes/        Les quatre routes, en fabriques configurables
+styles/tokens.css         Enums du schéma → variables du thème
+```
+
+**Propre au site — le reste du dépôt, qui est le dépôt modèle**
 ```
 /src
   /content
-    config.ts             Collections + schémas Zod (source de vérité du modèle)
+    config.ts             Déclaration de la collection
     site.json             Config globale : langues, navigation, pied de page
     /pages/{lang}/*.json  Contenu par page et par locale
   /components             Composants .astro — statiques par défaut
   /layouts
-  /editor                 Overlay d'édition (TypeScript vanilla)
+  /lib/locales.ts         Les langues de CE site
   /media                  Images téléversées — dans src/, pour qu'`<Image />` les traite au build
-  /styles                 Tokens de thème
-  /pages/[lang]/[...slug].astro
-/functions
-  /lib/auth.ts            verifyAuth / createSession
-  /lib/git-provider.ts    Abstraction GitHub / GitLab
-  /api/auth.ts            Vérification de la clé de site → cookie signé
-  /api/save.ts            Écriture : verifyAuth + Zod + commit
-  /api/upload.ts          Upload de médias
+  /styles/theme.css       La charte du client
+  /pages/[lang]/[...slug].astro, admin.astro, aide.astro
+/functions/api/*.ts       Quatre adaptateurs de trois lignes, jamais de règle
 /scripts
   check-html.mjs          CI : vérifie que le contenu est dans le HTML brut
   check-locales.mjs       CI : parité des clés entre locales
   check-logs.mjs          CI : aucun secret dans un appel à console.*
   check-secrets.mjs       CI : aucun secret dans le dossier de build
+  create-site.mjs         Prépare un nouveau site : clé, empreinte, variables
+  bootstrap.mjs           Extrait le contenu d'une page HTML déjà annotée
+/docs                     nouveau-site, migration, formation-client
 ```
+
+**Ce qui est dans `inline-core` ne se recopie jamais dans un site.** Une règle qui apparaît dans `/functions/api` est une règle au mauvais endroit.
 
 **Flux de lecture** : JSON → Astro → HTML statique sur CDN. Aucun appel réseau à l'exécution.
 
@@ -62,8 +80,8 @@ Ces règles priment sur toute autre considération. En cas de doute, demander pl
 
 **Deux points de couplage isolés**, et deux seulement :
 ```
-functions/lib/git-provider.ts   readFile / writeFile        (GitHub | GitLab)
-functions/lib/auth.ts           verifyAuth / createSession  (clé de site | délégué)
+packages/inline-core/src/server/git-provider.ts   readFile / writeFile        (GitHub | GitLab)
+packages/inline-core/src/server/auth.ts           verifyAuth / createSession  (clé de site | délégué)
 ```
 Aucune vérification d'identité ni appel à une API Git ailleurs dans le code.
 
@@ -71,7 +89,7 @@ Aucune vérification d'identité ni appel à une API Git ailleurs dans le code.
 
 ## Modèle de contenu
 
-Trois types de champs, pas un de plus. Définis dans `src/content/config.ts`, qui fait autorité.
+Trois types de champs, pas un de plus. Définis dans `packages/inline-core/src/schema.ts`, qui fait autorité.
 
 | Type | Forme | Usage |
 |---|---|---|
@@ -117,9 +135,11 @@ Ces enums sont dans le schéma Zod : une valeur hors liste fait échouer le buil
 ```bash
 npm run dev             # Serveur Astro local
 npm run build           # Build de production (échoue si Zod invalide)
-npm run check           # check-html + check-locales
-npm run editor          # Dev local avec mode édition actif
-wrangler pages dev      # Test local des fonctions
+npm run check           # HTML brut + parité des langues + journaux + secrets
+npm run test            # Toute la suite
+npm run serve:functions # Site + fonctions (wrangler pages dev)
+npm run create:site     # Prépare un nouveau site
+npm run bootstrap       # Reprend une page HTML annotée
 ```
 
 ---

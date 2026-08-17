@@ -41,9 +41,9 @@ async function load(entry) {
   return { module, cleanup: () => rm(dir, { recursive: true, force: true }) };
 }
 
-const image = await load('functions/lib/image.ts');
-const video = await load('src/lib/video.ts');
-const panel = await load('src/editor/media.ts');
+const image = await load('packages/inline-core/src/server/image.ts');
+const video = await load('packages/inline-core/src/video.ts');
+const panel = await load('packages/inline-core/src/editor/media.ts');
 
 const { inspectImage, describeRejectedFormat, normalizeFileName, uniqueFileName } = image.module;
 const { parseVideoUrl, isValidVideoReference, embedUrl } = video.module;

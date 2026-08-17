@@ -10,13 +10,24 @@
  * savoir qui il est.
  */
 import type { GitAuthor } from './git-provider';
-import { LOCALES } from '../../src/lib/locales';
 import { checkRateLimit } from './rate-limit';
 
 /** Contexte minimal d'une fonction de plateforme — évite une dépendance de types. */
 export interface FunctionContext {
   request: Request;
   env: Record<string, unknown>;
+}
+
+/**
+ * Ce que le site doit dire à `inline` — et la totalité de ce qu'il doit dire.
+ *
+ * Tout le reste (budgets, plafonds, formats, schéma) est identique d'un site à
+ * l'autre et vit dans le paquet. Si cette interface s'allonge, c'est le signe
+ * qu'une décision du paquet a fuité vers les sites.
+ */
+export interface SiteConfig {
+  /** Codes des langues du site. Un site monolingue en déclare une seule. */
+  locales: readonly string[];
 }
 
 export function json(
@@ -41,12 +52,23 @@ export function json(
  * code, configuration, workflows de déploiement — est hors d'atteinte, y
  * compris pour une session valide.
  *
- * Le segment de langue est restreint aux langues **déclarées** : sans cela,
- * `src/content/pages/zz/home.json` créerait un dossier que rien ne construit,
- * et le dépôt se remplirait de contenus invisibles.
+ * Le segment de langue est restreint aux langues **déclarées par le site** :
+ * sans cela, `src/content/pages/zz/home.json` créerait un dossier que rien ne
+ * construit, et le dépôt se remplirait de contenus invisibles. Les langues
+ * arrivent donc en paramètre — c'est la seule chose que le paquet ne peut pas
+ * savoir tout seul.
  */
-const LOCALE_SEGMENT = LOCALES.join('|');
-const ALLOWED_PATH = new RegExp(`^src/content/pages/(?:${LOCALE_SEGMENT})/[a-z0-9]+(?:-[a-z0-9]+)*\\.json$`);
+const cachedPatterns = new Map<string, RegExp>();
+
+function pathPattern(locales: readonly string[]): RegExp {
+  const key = locales.join('|');
+  let pattern = cachedPatterns.get(key);
+  if (!pattern) {
+    pattern = new RegExp(`^src/content/pages/(?:${key})/[a-z0-9]+(?:-[a-z0-9]+)*\\.json$`);
+    cachedPatterns.set(key, pattern);
+  }
+  return pattern;
+}
 
 /**
  * Le chemin est-il ouvert en lecture et en écriture ?
@@ -57,12 +79,12 @@ const ALLOWED_PATH = new RegExp(`^src/content/pages/(?:${LOCALE_SEGMENT})/[a-z0-
  * donc pas nécessaires — ils sont là pour que la règle reste vraie si
  * l'expression venait à s'assouplir.
  */
-export function isAllowedPath(path: unknown): path is string {
+export function isAllowedPath(path: unknown, locales: readonly string[]): path is string {
   if (typeof path !== 'string' || path.length === 0 || path.length > 120) return false;
   if (path.includes('..') || path.includes('\\') || path.includes('%') || path.includes('\0')) {
     return false;
   }
-  return ALLOWED_PATH.test(path);
+  return pathPattern(locales).test(path);
 }
 
 /** Les médias vivent ici pour que `<Image />` puisse les traiter au build. */

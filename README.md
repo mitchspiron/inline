@@ -9,9 +9,13 @@ Le client reçoit une URL, `monsite.fr/admin`, et une clé. Il entre, il modifie
 ses textes sur ses propres pages, il publie. Chaque publication est un commit ;
 le site se reconstruit dans la minute.
 
-**État : lots 0 à 6 livrés.** Textes, richtext, images, vidéos, listes,
-multilingue et durcissement. Reste l'industrialisation — voir *Ce qui n'est pas
-encore là*.
+**État : les huit lots sont livrés.** Textes, richtext, images, vidéos,
+listes, multilingue, durcissement, industrialisation. Le périmètre v1 est
+gelé — voir *Hors périmètre*.
+
+La partie partagée entre tous les sites vit dans
+[packages/inline-core](packages/inline-core), versionnée. Le reste de ce dépôt
+est le **dépôt modèle** dont part chaque nouveau site.
 
 ---
 
@@ -27,14 +31,16 @@ encore là*.
 
 ```bash
 npm install
-npm run make:key      # génère la clé du site, son empreinte et le secret de session
-cp .env.example .dev.vars
+npm run create:site -- --nom "Essai local" --ecrire
 ```
 
-Reportez dans `.dev.vars` les deux lignes affichées par `make:key`
-(`EDITOR_KEY_HASH` et `SESSION_SECRET`), puis vos accès au dépôt. **La clé
-elle-même n'est stockée nulle part** : copiez-la, c'est elle que le client
-saisira. Une clé perdue se régénère, elle ne se retrouve pas.
+La commande génère la clé du site, son empreinte et le secret de session, puis
+écrit un `.dev.vars` prêt à l'emploi. **La clé elle-même n'est stockée nulle
+part** : copiez-la, c'est elle que vous saisirez. Une clé perdue se régénère,
+elle ne se retrouve pas.
+
+Pour un vrai site, lancer la même commande sans `--ecrire` et poser les
+variables chez l'hébergeur — voir [docs/nouveau-site.md](docs/nouveau-site.md).
 
 ```bash
 npm run build            # construit le site
@@ -80,8 +86,10 @@ npm run dev              # Serveur Astro seul — le site, sans les fonctions ni
 npm run build            # Build de production (échoue si le contenu est invalide)
 npm run serve:functions  # Site + fonctions : c'est ici qu'on édite en local
 npm run check            # HTML brut + parité des langues + journaux + aucun secret
-npm run test             # Git, authentification, durcissement, assainissement, médias, HEIC, langues, overlay
-npm run make:key         # Génère une clé de site, son empreinte, un secret de session
+npm run test             # Git, authentification, durcissement, amorçage, assainissement, médias, HEIC, langues, overlay
+npm run create:site      # Prépare un nouveau site : clé, empreinte, variables, aide-mémoire
+npm run bootstrap        # Extrait le contenu d'une page HTML déjà annotée
+npm run make:key         # Génère seulement une clé et son empreinte (rotation)
 npm run mock:git         # Faux service Git local, pour essayer sans dépôt
 ```
 
@@ -206,7 +214,7 @@ Les espaces clé-valeur des hébergeurs sont à cohérence différée : la prote
 reste efficace contre une force brute — qui suppose des milliers d'essais —
 mais n'est pas exacte à l'unité. Pour un comptage strict, viser un stockage
 fortement cohérent (Durable Object ou équivalent) en implémentant
-`RateLimitStore` dans [functions/lib/rate-limit.ts](functions/lib/rate-limit.ts).
+`RateLimitStore` dans [packages/inline-core/src/server/rate-limit.ts](packages/inline-core/src/server/rate-limit.ts).
 
 ---
 
@@ -233,29 +241,51 @@ de confort dont on oublie de sortir.
 
 ## Comment c'est agencé
 
+Le dépôt est séparé en deux, et c'est toute la question de l'exploitation :
+ce qui est identique d'un client à l'autre est **partagé et versionné**, ce qui
+lui appartient est copié puis adapté.
+
+**Partagé — [packages/inline-core](packages/inline-core), version 1.0.0**
+
 ```
-src/content/schema.ts        Schéma Zod — utilisé par le build ET par la fonction d'écriture
+src/schema.ts              Schéma Zod — le build ET la fonction d'écriture
+src/style-tokens.ts        Les variantes autorisées, source unique
+src/safe-href.ts           Ce qu'est un lien sûr, des deux côtés
+src/video.ts               Lecture d'une adresse YouTube / Vimeo
+src/translate.ts           Repli de traduction (pas la liste des langues)
+src/editor/                Overlay d'édition (TypeScript vanilla, 37 Ko)
+src/editor/heic.ts         Décodage des photos HEIC, chargé à la demande
+src/server/auth.ts         Clé de site, sessions — seul juge de l'identité
+src/server/guard.ts        Débit, plafonds, chemins autorisés
+src/server/rate-limit.ts   Comptage des appels, stockage interchangeable
+src/server/git-provider.ts Interface du fournisseur Git
+src/server/github.ts       Implémentation GitHub (version = SHA du blob)
+src/server/gitlab.ts       Signature + notes, non implémenté
+src/server/routes/         Les quatre routes, en fabriques configurables
+styles/tokens.css          Correspondance enums du schéma → variables du thème
+```
+
+**Propre au site — le reste du dépôt**
+
+```
 src/content/config.ts        Déclaration de la collection
-src/content/pages/fr/*.json  Le contenu
-src/content/site.json        Navigation, coordonnées, mentions — structure, pas contenu
+src/content/pages/{lang}/    Le contenu
+src/content/site.json        Navigation, coordonnées — structure, pas contenu
+src/lib/locales.ts           Les langues de CE site
 src/styles/theme.css         La charte : palette, échelle typographique, rythme
-src/styles/tokens.css        Correspondance enums du schéma → thème
-src/components/Editable.astro    Rend un champ et pose son data-cms
+src/components/              Editable, Media, Collection, et les vôtres
 src/layouts/Base.astro       Métadonnées, éléments partagés, amorce d'édition
-src/pages/index.astro        La page
+src/pages/[lang]/            Les pages
 src/pages/admin.astro        La saisie de la clé, et rien d'autre
-src/editor/heic.ts           Décodage des photos HEIC, chargé à la demande
-src/editor/                  Overlay d'édition (TypeScript vanilla, 9 Ko)
-functions/lib/auth.ts        Clé de site, sessions — seul juge de l'identité
-functions/lib/rate-limit.ts  Comptage des tentatives, stockage interchangeable
-functions/lib/git-provider.ts    Interface du fournisseur Git
-functions/lib/github.ts      Implémentation GitHub (version = SHA du blob)
-functions/lib/gitlab.ts      Signature + notes, non implémenté
-functions/api/auth.ts        Ouverture et fermeture de session
-functions/api/content.ts     Lecture : contenu + version de référence
-functions/api/save.ts        Écriture : validation, verrou, commit
+src/pages/aide.astro         Le mode d'emploi du client, en une page
+src/media/                   Les images téléversées
+functions/api/*.ts           Quatre adaptateurs de trois lignes
 scripts/                     Contrôles et outils de test
 ```
+
+Ce qui est dans `inline-core` **ne se recopie jamais**. Un correctif de
+sécurité doit atteindre les dix sites en changeant un numéro de version, pas en
+dix modifications à retrouver.
 
 **Flux de lecture** : JSON → Astro → HTML statique. Aucun appel réseau à
 l'exécution, aucun JavaScript nécessaire à l'affichage du contenu.
@@ -265,7 +295,7 @@ Zod → commit → reconstruction.
 
 ### Quatre points qui méritent d'être connus
 
-**Le schéma vit dans `src/content/schema.ts`, pas dans `config.ts`.** La
+**Le schéma vit dans `inline-core/schema`, pas dans `config.ts`.** La
 fonction d'écriture ne peut pas importer `astro:content` : en isolant le schéma
 Zod dans un fichier neutre, le build et l'écriture valident avec le *même*
 objet, pas avec deux copies qui finiraient par diverger.
@@ -304,7 +334,7 @@ valeur n'arrive pas dans le HTML.
 
 **Sur un champ texte**, une barre apparaît au clic : taille, épaisseur,
 italique, alignement, couleurs du thème. Ses boutons sont construits à partir
-de `src/lib/style-tokens.ts`, d'où le schéma Zod tire aussi ses enums — un
+de `inline-core/style-tokens`, d'où le schéma Zod tire aussi ses enums — un
 bouton proposant une valeur que le build refuserait est donc impossible, il n'y
 a pas deux listes à tenir d'accord.
 
@@ -408,6 +438,47 @@ serait servi tel quel, sans AVIF, sans jeu de largeurs, sans dimensions.
 
 ---
 
+## Mettre en place un site
+
+Trois documents, dans l'ordre où on s'en sert :
+
+- **[docs/nouveau-site.md](docs/nouveau-site.md)** — partir du dépôt modèle,
+  générer les accès, poser la charte, déployer, vérifier. Une à deux journées.
+- **[docs/migration.md](docs/migration.md)** — reprendre un site statique
+  existant. Annoter le HTML, puis `npm run bootstrap` en extrait le contenu.
+  Page par page : rien n'oblige à tout convertir d'un coup.
+- **[docs/formation-client.md](docs/formation-client.md)** — le script de la
+  capsule de six minutes livrée avec la clé.
+
+```bash
+npm run create:site -- --nom "Boulangerie Martin" --depot agence/boulangerie-martin
+```
+
+La commande affiche deux blocs qui ne voyagent pas ensemble : ce qui part chez
+le client (une clé, une adresse) et ce qui part chez l'hébergeur (l'empreinte,
+les secrets, le jeton), plus la liste de vérification d'avant livraison.
+
+### Reprendre un site existant
+
+```bash
+npm run bootstrap -- --html ancien-site/accueil.html --page accueil --essai
+```
+
+L'amorçage lit les valeurs **déjà présentes** dans une page annotée et en fait
+le fichier de contenu : textes et leurs variantes de style, richtext, images
+avec description et dimensions, vidéos converties en fournisseur + identifiant,
+listes avec leurs identifiants.
+
+Ce qu'il ne fait pas : décider ce que le client a le droit de changer. C'est le
+vrai travail d'une reprise, et il ne s'automatise pas.
+
+Ce qu'il refuse de faire : inventer. Une image sans description fait échouer
+l'amorçage plutôt que de produire un `alt` vide. Une valeur plausible inventée
+à ce stade se retrouve en production, invisible en revue, et personne ne la
+corrige jamais.
+
+---
+
 ## Sécurité
 
 **Ce qui est protégé, c'est l'écriture, pas l'interface.**
@@ -451,7 +522,7 @@ un DOM en JavaScript pur (linkedom), DOMPurify **ne lève aucune erreur** : il
 passe `isSupported` à faux et renvoie son entrée telle quelle. Vérifié dans le
 runtime, un `<script>` et un `href="javascript:"` ressortaient intacts.
 
-`functions/lib/sanitize.ts` reconstruit donc le fragment depuis son analyse
+[packages/inline-core/src/server/sanitize.ts](packages/inline-core/src/server/sanitize.ts) reconstruit donc le fragment depuis son analyse
 syntaxique : seule la liste blanche est réécrite, le reste n'existe pas dans le
 résultat. `npm run test:sanitize` soumet le même corpus aux deux
 implémentations et compare les sorties — c'est ce test qui garantit qu'elles ne
@@ -498,15 +569,25 @@ jour-là.
 
 ---
 
-## Ce qui n'est pas encore là
+## Hors périmètre
 
-Industrialisation (lot 7) : dépôt modèle, overlay partagé et versionné, script
-de création de site, amorçage d'un site existant.
+Le périmètre v1 est gelé. Ne pas implémenter sans validation explicite :
+workflow de validation multi-rôles, permissions granulaires, versionnement
+visuel du contenu, A/B testing, formulaires avec stockage, recherche interne,
+commentaires, espace membre, éditeur de mise en page.
 
-L'implémentation GitLab reste à écrire — [gitlab.ts](functions/lib/gitlab.ts)
-porte la signature et les six points à connaître avant de s'y mettre.
+Si l'un de ces besoins remonte, le signaler : il indique probablement qu'un CMS
+du marché serait plus adapté.
 
-Le comptage de débit s'appuie sur un espace clé-valeur à cohérence différée : il
-arrête une force brute, qui suppose des milliers d'essais, mais n'est pas exact
-à l'unité. Pour un comptage strict, implémenter `RateLimitStore` sur un
-stockage fortement cohérent.
+### Ce qui reste à écrire
+
+- **GitLab.** [gitlab.ts](packages/inline-core/src/server/gitlab.ts) porte la
+  signature et les six points à connaître avant de s'y mettre.
+- **Un comptage de débit exact.** Celui en place s'appuie sur un espace
+  clé-valeur à cohérence différée : il arrête une force brute, qui suppose des
+  milliers d'essais, mais n'est pas exact à l'unité. Pour un comptage strict,
+  implémenter `RateLimitStore` sur un stockage fortement cohérent.
+- **Le recadrage d'image se fait au centre**, sans réglage : un visage au bord
+  du cadre se retrouve coupé.
+- **Les listes se réordonnent avec « Monter » et « Descendre »**, pas au
+  glisser-déposer.

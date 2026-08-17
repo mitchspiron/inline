@@ -6,7 +6,7 @@
  * long soit refusé.
  */
 import raw from './site.json';
-import { siteSchema, type Site } from './schema';
+import { siteSchema, type Site } from 'inline-core/schema';
 
 const parsed = siteSchema.safeParse(raw);
 

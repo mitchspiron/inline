@@ -5,7 +5,7 @@
  * Ne contient QUE des valeurs de contenu — jamais de clé, jamais de jeton,
  * jamais de cookie.
  */
-import type { StyleTokens } from '../lib/style-tokens';
+import type { StyleTokens } from '../style-tokens';
 
 export interface FieldEdit {
   /** Texte ou balisage saisi. */

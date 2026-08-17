@@ -107,7 +107,16 @@ export function mountUi(handlers: {
     bar.appendChild(notice);
   }
 
-  bar.append(status, reset, publish);
+  // Un lien, pas un panneau : l'aide tient sur une page du site, elle n'a pas
+  // à vivre dans l'overlay ni à ouvrir une fenêtre par-dessus le travail.
+  const help = document.createElement('a');
+  help.className = 'cms-ui-help';
+  help.href = '/aide';
+  help.target = '_blank';
+  help.rel = 'noopener';
+  help.textContent = 'Aide';
+
+  bar.append(status, help, reset, publish);
   document.body.appendChild(bar);
 
   let banner: HTMLElement | null = null;

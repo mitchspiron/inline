@@ -1,0 +1,53 @@
+<!-- Page d un site statique existant, annotee pour l amorcage.
+     Sert de fixture a scripts/test-bootstrap.mjs : ne pas la corriger sans
+     mettre le test a jour. Le champ « pied.mention » est volontairement hors
+     perimetre, le test derive lui-meme une variante incomplete pour verifier le refus. -->
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Boulangerie Martin — pains au levain</title>
+    <meta name="description" content="Boulangerie artisanale à Nantes. Pains au levain, viennoiseries, tourtes." />
+  </head>
+  <body>
+    <h1 data-cms="blocks.hero.title" class="cms-size-3xl cms-weight-bold cms-align-center">
+      Le pain au levain, tous les matins
+    </h1>
+    <p data-cms="blocks.hero.subtitle" class="cms-size-lg cms-color-muted">
+      Farines biologiques, fermentation lente, cuisson au feu de bois.
+    </p>
+
+    <p data-cms="blocks.about.body" data-cms-type="richtext">
+      Nous <strong>pétrissons</strong> chaque nuit et vendons <em>le jour même</em>.
+      <a href="/contact">Passez nous voir</a>.
+    </p>
+
+    <img
+      data-cms="blocks.about.photo"
+      data-cms-type="media"
+      src="/img/Fournil de la boulangerie.JPG"
+      alt="Le fournil au petit matin"
+      width="1600"
+      height="900"
+    />
+
+    <figure data-cms="blocks.about.film" data-cms-type="media">
+      <iframe src="https://www.youtube.com/embed/aqz-KE-bpKQ" title="Une nuit au fournil"></iframe>
+    </figure>
+
+    <img data-cms="blocks.about.plan" data-cms-type="media" src="/img/plan.png" alt="Plan d accès à la boulangerie" width="800" height="600" />
+
+    <ul data-cms-list="collections.avis">
+      <li data-cms-item="a-001">
+        <blockquote data-cms="collections.avis.a-001.quote">Le meilleur pain de la ville.</blockquote>
+        <cite data-cms="collections.avis.a-001.author">Claire D.</cite>
+      </li>
+      <li data-cms-item="a-002">
+        <blockquote data-cms="collections.avis.a-002.quote">On vient de loin pour la tourte.</blockquote>
+        <cite data-cms="collections.avis.a-002.author">Yannis M.</cite>
+      </li>
+    </ul>
+
+    <p data-cms="pied.mention">Mention hors périmètre</p>
+  </body>
+</html>

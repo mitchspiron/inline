@@ -15,7 +15,7 @@
  * implémentations sont comparées sur un même corpus par
  * `scripts/test-sanitize.mjs`.
  */
-import { isSafeHref } from '../lib/safe-href';
+import { isSafeHref } from '../safe-href';
 
 const ALLOWED_TAGS = ['strong', 'em', 'a', 'br', 'ul', 'ol', 'li'];
 const ALLOWED_ATTR = ['href'];

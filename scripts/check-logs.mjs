@@ -22,7 +22,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Les répertoires qui produisent du code exécuté avec des secrets à portée. */
-const SCANNED = ['functions', 'src/editor', 'src/lib', 'src/pages'];
+const SCANNED = ['functions', 'packages/inline-core/src', 'src'];
 
 /**
  * Identifiants qui ne doivent jamais être évalués dans un appel de journal.

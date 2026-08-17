@@ -1,5 +1,6 @@
 ---
-import '../styles/tokens.css';
+import 'inline-core/styles/tokens.css';
+import '../styles/theme.css';
 import { site } from '../content/site';
 import { DEFAULT_LOCALE, LOCALE_LABELS, localePath } from '../lib/locales';
 
@@ -44,7 +45,7 @@ const defaultAlternate = alternates.find((entry) => entry.locale === DEFAULT_LOC
  * En développement, l'overlay est servi par Vite depuis les sources ;
  * en production, c'est le paquet compilé par esbuild.
  */
-const overlaySrc = import.meta.env.DEV ? '/src/editor/index.ts' : '/editor/overlay.js';
+const overlaySrc = import.meta.env.DEV ? '/packages/inline-core/src/editor/index.ts' : '/editor/overlay.js';
 ---
 
 <!doctype html>
@@ -74,7 +75,13 @@ const overlaySrc = import.meta.env.DEV ? '/src/editor/index.ts' : '/editor/overl
     data-cms-locale={locale}
     data-cms-page={pageName}
     data-cms-untranslated={untranslated > 0 ? String(untranslated) : undefined}
-    data-cms-locales={alternates.map((entry) => `${entry.locale}:${entry.href}`).join(',')}
+    data-cms-locales={JSON.stringify(
+      alternates.map((entry) => ({
+        locale: entry.locale,
+        href: entry.href,
+        label: LOCALE_LABELS[entry.locale as keyof typeof LOCALE_LABELS] ?? entry.locale,
+      })),
+    )}
   >
     <nav class="site-langs" aria-label="Langues">
       {

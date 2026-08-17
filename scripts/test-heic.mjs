@@ -38,7 +38,7 @@ function skip(label, why) {
 const dir = await mkdtemp(join(tmpdir(), 'inline-heic-'));
 const outfile = join(dir, 'heic.mjs');
 await build({
-  entryPoints: [join(root, 'src/editor/heic.ts')],
+  entryPoints: [join(root, 'packages/inline-core/src/editor/heic.ts')],
   bundle: true,
   format: 'esm',
   platform: 'neutral',

@@ -2,11 +2,17 @@
  * Correspondance entre les enums du schéma Zod et le thème.
  *
  * Une classe par valeur autorisée, et rien d'autre. Aucune valeur en dur ici :
- * tout pointe vers une variable de theme.css. Une valeur hors enum fait échouer
- * le build bien avant d'arriver ici — il n'y a donc pas de classe de repli.
+ * tout pointe vers une variable que **le site** définit dans sa propre charte.
+ * Une valeur hors enum fait échouer le build bien avant d'arriver ici — il n'y
+ * a donc pas de classe de repli.
+ *
+ * Ce fichier vit dans `inline-core` avec le schéma, et pas dans le site : une
+ * classe manquante ici et un token accepté là-bas donneraient un contenu
+ * valide qui ne s'affiche pas. Les deux se mettent à jour ensemble.
+ *
+ * Le site fournit les variables (`--color-primary`, `--size-lg`, …) — voir
+ * `src/styles/theme.css` du dépôt modèle.
  */
-
-@import './theme.css';
 
 * {
   box-sizing: border-box;

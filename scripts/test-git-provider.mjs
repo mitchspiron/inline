@@ -36,7 +36,7 @@ async function loadProvider() {
   const dir = await mkdtemp(join(tmpdir(), 'git-provider-'));
   const outfile = join(dir, 'git-provider.mjs');
   await build({
-    entryPoints: [join(root, 'functions/lib/git-provider.ts')],
+    entryPoints: [join(root, 'packages/inline-core/src/server/git-provider.ts')],
     bundle: true,
     format: 'esm',
     platform: 'node',

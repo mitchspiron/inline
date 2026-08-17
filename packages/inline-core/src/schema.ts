@@ -9,7 +9,7 @@
  * `zod` est ici la même instance que celle réexportée par `astro:content`.
  */
 import { z } from 'zod';
-import { ALIGNMENTS, COLORS, SIZES, WEIGHTS } from '../lib/style-tokens';
+import { ALIGNMENTS, COLORS, SIZES, WEIGHTS } from './style-tokens';
 
 /**
  * Tokens de style. Liste blanche stricte : aucune valeur libre, aucun repli

@@ -1,0 +1,175 @@
+---
+import 'inline-core/styles/tokens.css';
+import '../styles/theme.css';
+import { site } from '../content/site';
+
+/**
+ * L'aide du client, en une page.
+ *
+ * Contrainte tenue : tout tient sur un écran de lecture, sans sommaire, sans
+ * onglets, sans recherche. Un mode d'emploi qu'il faut parcourir est un mode
+ * d'emploi qu'on ne lit pas — et si l'outil avait besoin de plus, ce serait le
+ * signe qu'il est trop compliqué.
+ *
+ * Aucun mot technique ici. Pas de « JSON », pas de « commit », pas de « clé
+ * d'API ». Le client ne verra jamais le code : le vocabulaire de la page est
+ * celui de son métier, pas du nôtre.
+ */
+---
+
+<!doctype html>
+<html lang={site.locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Comment modifier votre site</title>
+    <meta name="robots" content="noindex, nofollow" />
+  </head>
+  <body>
+    <main class="aide">
+      <h1>Comment modifier votre site</h1>
+
+      <section>
+        <h2>Pour commencer</h2>
+        <ol>
+          <li>Ouvrez <a href="/admin">votre page d'accès</a> et saisissez votre clé.</li>
+          <li>Vous arrivez sur votre site. Une barre apparaît en bas de l'écran.</li>
+          <li>Naviguez jusqu'à la page à modifier, comme un visiteur.</li>
+        </ol>
+        <p class="aide-note">
+          Sur téléphone ou tablette, la modification n'est pas possible : il faut un
+          ordinateur. Votre site, lui, reste consultable partout.
+        </p>
+      </section>
+
+      <section>
+        <h2>Modifier un texte</h2>
+        <p>
+          Cliquez sur le texte. Il devient modifiable, et une petite barre propose
+          la taille, la graisse, l'alignement et la couleur. Ces choix sont ceux de
+          votre charte : vous ne pouvez pas dépareiller la page.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changer une image</h2>
+        <p>
+          Cliquez sur l'image, puis choisissez un fichier. Prenez la photo telle
+          qu'elle sort de votre appareil ou de votre téléphone — inutile de la
+          réduire ou de la convertir, c'est fait pour vous.
+        </p>
+        <p>
+          Remplissez la <strong>description de l'image</strong> : c'est ce que
+          lisent les personnes malvoyantes et les moteurs de recherche.
+        </p>
+      </section>
+
+      <section>
+        <h2>Ajouter une vidéo</h2>
+        <p>
+          Copiez l'adresse de la vidéo depuis YouTube ou Vimeo et collez-la. La
+          vidéo reste hébergée là-bas : rien n'est déposé sur votre site, qui
+          reste rapide.
+        </p>
+      </section>
+
+      <section>
+        <h2>Listes : avis, services, questions</h2>
+        <p>
+          Survolez une liste : des boutons apparaissent pour <em>ajouter</em>,
+          <em>dupliquer</em>, <em>déplacer</em> ou <em>supprimer</em> un élément.
+          Une suppression demande toujours confirmation.
+        </p>
+      </section>
+
+      <section>
+        <h2>Publier</h2>
+        <p>
+          Tant que vous n'avez pas cliqué sur <strong>Publier</strong>, vos
+          modifications ne sont visibles que par vous. Elles sont conservées même
+          si vous fermez la fenêtre : vous les retrouverez à la réouverture.
+        </p>
+        <p>
+          Après publication, comptez une minute avant que le site en ligne soit à
+          jour. C'est normal, il se reconstruit.
+        </p>
+      </section>
+
+      <section>
+        <h2>Si quelque chose ne va pas</h2>
+        <dl>
+          <dt>« Cette page a été modifiée ailleurs »</dt>
+          <dd>
+            Quelqu'un d'autre a publié entre-temps. Rechargez la page : vos
+            modifications sont conservées, vous pourrez republier.
+          </dd>
+
+          <dt>« Votre session a pris fin »</dt>
+          <dd>
+            Au bout de huit heures, il faut ressaisir votre clé. Rien n'est perdu.
+          </dd>
+
+          <dt>« Patientez quelques minutes »</dt>
+          <dd>
+            Vous avez publié beaucoup de fois coup sur coup. Attendez un moment,
+            puis réessayez.
+          </dd>
+
+          <dt>Je me suis trompé et j'ai déjà publié</dt>
+          <dd>
+            Rien n'est définitivement perdu : chaque publication est conservée.
+            Écrivez-nous, nous remettons la version précédente.
+          </dd>
+        </dl>
+      </section>
+
+      <section>
+        <h2>Une question ?</h2>
+        <p>
+          Écrivez-nous à <a href={`mailto:${site.contact.email}`}>{site.contact.email}</a>.
+          Clé perdue ou plus valable : nous vous en transmettons une nouvelle.
+        </p>
+      </section>
+    </main>
+
+    <style>
+      .aide {
+        max-width: 42rem;
+        margin: 0 auto;
+        padding: var(--space-6) var(--space-3) var(--space-8);
+      }
+      .aide h1 {
+        font-size: var(--size-2xl);
+        margin: 0 0 var(--space-5);
+      }
+      .aide h2 {
+        font-size: var(--size-lg);
+        margin: 0 0 var(--space-2);
+      }
+      .aide section {
+        margin-bottom: var(--space-5);
+      }
+      .aide p,
+      .aide li,
+      .aide dd {
+        color: var(--color-secondary);
+        margin: 0 0 var(--space-2);
+      }
+      .aide ol {
+        padding-left: var(--space-4);
+      }
+      .aide dt {
+        font-weight: 600;
+        margin-top: var(--space-3);
+      }
+      .aide dd {
+        margin-left: 0;
+      }
+      .aide-note {
+        background: var(--color-surface-alt);
+        border-left: 3px solid var(--color-accent);
+        padding: var(--space-2) var(--space-3);
+      }
+    </style>
+  </body>
+</html>

@@ -42,7 +42,7 @@ if (!html.includes('data-cms-file')) {
 
 const overlay = (
   await build({
-    entryPoints: [join(root, 'src/editor/index.ts')],
+    entryPoints: [join(root, 'packages/inline-core/src/editor/index.ts')],
     bundle: true,
     format: 'iife',
     target: 'es2020',
@@ -258,7 +258,7 @@ console.log('\nBarre d\'outils');
 
 const tokensModule = (
   await build({
-    entryPoints: [join(root, 'src/lib/style-tokens.ts')],
+    entryPoints: [join(root, 'packages/inline-core/src/style-tokens.ts')],
     bundle: true,
     format: 'esm',
     platform: 'neutral',
