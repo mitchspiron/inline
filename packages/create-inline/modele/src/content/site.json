@@ -1,0 +1,20 @@
+{
+  "name": "__NOM__",
+  "locale": "fr",
+  "navigation": [
+    {
+      "label": "Accueil",
+      "href": "/"
+    },
+    {
+      "label": "Nous contacter",
+      "href": "mailto:__COURRIEL__"
+    }
+  ],
+  "contact": {
+    "email": "__COURRIEL__"
+  },
+  "footer": {
+    "legal": "© __NOM__"
+  }
+}

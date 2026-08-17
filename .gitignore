@@ -12,6 +12,9 @@ dist/
 !.env.example
 .dev.vars
 
+# Ateliers de test
+.tmp-scaffold-*/
+
 # Outils
 .wrangler/
 *.log

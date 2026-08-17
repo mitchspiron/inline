@@ -31,23 +31,21 @@ function resolveField(source: unknown, keyPath: string): ImageField | VideoField
 }
 
 /**
- * Les fichiers vivent dans `src/media` et non dans `public/media` : c'est la
- * seule façon pour `<Image />` de les traiter au build — AVIF, WebP, jeu de
- * largeurs, dimensions calculées. Un fichier de `public/` serait servi tel
- * quel, sans aucune de ces garanties.
+ * Les fichiers vivent dans `src/media` du site et non dans `public/media` :
+ * c'est la seule façon pour `<Image />` de les traiter au build — AVIF, WebP,
+ * jeu de largeurs, dimensions calculées. Un fichier de `public/` serait servi
+ * tel quel, sans aucune de ces garanties.
+ *
+ * Ce composant vit dans le paquet, les images vivent dans le site : la
+ * recherche des fichiers doit donc s'exécuter là-bas. `inline:media` est
+ * résolu par l'intégration vers `src/media/library.ts` du site, qu'elle crée
+ * s'il manque.
  */
-// Le motif est relatif à ce fichier, et non absolu : un motif absolu est
-// résolu depuis la racine du projet, dont l'écriture varie selon la façon dont
-// le build est lancé — sous Windows, la casse de la lettre de lecteur suffit à
-// le faire échouer.
-const library = import.meta.glob<{ default: ImageMetadata }>(
-  '../media/**/*.{png,jpg,jpeg,webp,avif}',
-  { eager: true },
-);
+import { library } from 'inline:media';
 
 function resolveImage(src: string): ImageMetadata {
   const name = src.replace(/^\/+/, '').replace(/^src\/media\//, '');
-  const entry = library[`../media/${name}`];
+  const entry = library[`./${name}`];
   if (!entry) {
     throw new Error(
       `[Media] Le fichier « ${src} » est absent de src/media. ` +

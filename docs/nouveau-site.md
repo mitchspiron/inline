@@ -1,7 +1,7 @@
 # Mettre en place un nouveau site
 
-Compter une à deux journées, dont la moitié pour l'intégration graphique. Le
-reste est mécanique.
+Compter une journée, dont la plus grande part pour l'intégration graphique.
+Le reste est mécanique.
 
 ---
 
@@ -11,8 +11,8 @@ Le dépôt est séparé en deux, et c'est toute la question :
 
 | | Où | Par site |
 |---|---|---|
-| Overlay, modèle, routes, sécurité | `packages/inline-core` | **partagé, versionné** |
-| Contenu, charte, composants, pages | `src/`, `functions/` | copié puis adapté |
+| Overlay, modèle, composants, routes, sécurité | `inline-core` | **dépendance versionnée** |
+| Contenu, charte, mise en page, adaptateurs | le projet | créé une fois, puis adapté |
 
 Ce qui est dans `inline-core` **ne se recopie jamais**. Un correctif de
 sécurité doit atteindre les dix sites en changeant un numéro de version, pas en
@@ -21,37 +21,44 @@ tenable au-delà de trois clients.
 
 ---
 
-## 1. Partir du dépôt modèle
+## 1. Créer le projet
 
-Le site de ce dépôt **est** le modèle : une page, deux langues, une liste, une
-image, une vidéo, une charte complète. Copier tout sauf `packages/` et le
-contenu :
-
-```
-astro.config.mjs      wrangler.toml       tsconfig.json
-functions/api/        les quatre adaptateurs, tels quels
-src/components/       Editable, Media, Collection — à garder
-src/layouts/          à adapter
-src/pages/            [lang]/[...slug].astro, admin.astro, aide.astro
-src/styles/theme.css  à remplacer par la charte du client
-src/content/          site.json + une page par gabarit
-scripts/              les contrôles et les tests
-.github/workflows/    les contrôles automatiques
+```bash
+npm create inline@latest boulangerie-martin -- \
+  --nom "Boulangerie Martin" --courriel contact@boulangerie-martin.fr
 ```
 
-Puis, dans `package.json`, dépendre du paquet publié plutôt que de l'espace de
-travail local :
+La commande écrit le squelette et affiche la clé du site, une fois. Elle pose
+aussi un `.dev.vars` prêt à l'emploi, pour éditer dès la première minute sans
+dépôt ni hébergeur :
 
-```json
-"dependencies": { "astro": "^5.2.5", "inline-core": "^1.0.0" }
+```bash
+cd boulangerie-martin && npm install
+npm run build
+npm run serve:functions
 ```
+
+Ouvrir `http://127.0.0.1:8788/admin`, saisir la clé, modifier un texte,
+publier.
 
 Un dépôt par client. Le contenu d'un client ne doit jamais côtoyer celui d'un
 autre : c'est aussi ce qui circonscrit un incident.
 
+### Ce que le projet contient — et ne contient pas
+
+Il contient sa configuration, son contenu, sa charte, ses pages, et quatre
+adaptateurs de routes de cinq lignes. Il ne contient **aucune** logique
+d'édition : ni overlay, ni schéma, ni vérification d'identité. Tout cela vient
+d'`inline-core`, en dépendance versionnée.
+
+C'est ce qui rend l'exploitation tenable : un correctif de sécurité atteint les
+dix sites par un `npm update`, pas par dix modifications à retrouver.
+
 ---
 
-## 2. Générer les accès
+## 2. Les accès de production
+
+Ceux du projet créé ne valent que pour l'essai local. Pour la mise en ligne :
 
 ```bash
 npm run create:site -- --nom "Boulangerie Martin" --depot agence/boulangerie-martin
@@ -64,12 +71,6 @@ livraison.
 
 La clé n'est écrite nulle part. Ce qui n'est pas copié à ce moment-là est
 perdu — et c'est voulu : une clé oubliée se régénère, elle ne se retrouve pas.
-
-Pour essayer en local tout de suite :
-
-```bash
-npm run create:site -- --nom "Essai" --ecrire
-```
 
 ---
 
@@ -92,10 +93,13 @@ Site neuf : partir des fichiers du modèle et les remplir.
 Site existant : voir [migration.md](migration.md) — annoter le HTML, puis
 `npm run bootstrap`.
 
-Site monolingue : ramener `LOCALES` à une seule entrée dans
-`src/lib/locales.ts`, `i18n.locales` dans `astro.config.mjs`, et `LOCALES` dans
-`scripts/check-locales.mjs`. Rien d'autre ne change — le repli de traduction ne
-se déclenche jamais et le contrôle de parité n'a rien à comparer.
+Le projet créé est monolingue. Pour ajouter une langue : déclarer son code
+dans `locales` de l'intégration, dans `LOCALES` de `src/lib/locales.ts` avec
+son nom dans `LOCALE_LABELS`, dans `i18n.locales` d'`astro.config.mjs` et
+dans `scripts/check-locales.mjs`. Puis créer `src/content/pages/{code}/`.
+
+Tant que les fichiers manquent, les pages s'affichent dans la langue de
+référence et `npm run check` le signale.
 
 ---
 

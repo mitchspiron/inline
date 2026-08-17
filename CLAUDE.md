@@ -15,7 +15,7 @@ Un système d'édition en front pour sites statiques : le contenu vit dans des f
 Ces règles priment sur toute autre considération. En cas de doute, demander plutôt que supposer.
 
 1. **`output: 'static'` — jamais SSR, jamais hybride.** Aucune proposition de rendu serveur ne doit être retenue.
-2. **Aucune directive `client:*` sur un composant affichant du contenu éditorial.** C'est la règle la plus facile à enfreindre par réflexe et la plus coûteuse : elle sort le contenu du HTML brut, donc de l'index des crawlers IA. Seules exceptions : l'overlay d'édition, et les interactions purement visuelles dont tous les éléments sont déjà dans le HTML (un carousel doit contenir tous ses slides en dur, le JS ne fait que les faire défiler).
+2. **Aucune zone éditable à l'intérieur d'un composant hydraté.** Deux raisons distinctes, à ne pas confondre : `client:only` sort le contenu du HTML brut, donc de l'index des crawlers IA ; `client:load` l'y laisse mais **réaffiche la zone au chargement, effaçant les modifications en cours du client** — c'est la plus contraignante, et elle ne se voit pas dans la source. Hors zone éditable, un composant React, Vue ou Svelte est légitime : rendu au build sans directive `client:*`, il produit du HTML statique ; hydraté, il ne gêne rien tant qu'aucun `data-cms` n'est dedans (un carousel doit contenir tous ses slides en dur, le JS ne fait que les faire défiler). `check-html.mjs` applique exactement cette règle.
 3. **Le token Git ne quitte jamais le serveur.** Il appartient à l'agence, pas au client. Aucun code ne doit le placer dans une réponse, un fichier servi, `localStorage` ou `sessionStorage`.
 3 bis. **La clé de site est vérifiée exclusivement côté serveur.** Ne jamais servir `EDITOR_KEY_HASH` au navigateur, ne jamais comparer la clé en JavaScript client. Un hash exposé est attaquable hors ligne.
 4. **Aucun secret dans le dépôt.** Tokens et clés vivent exclusivement en variables d'environnement de la fonction serveur — l'hébergeur n'est pas tranché, aucun code ne doit en dépendre.
@@ -35,6 +35,9 @@ Le dépôt est séparé en deux. **Ce qui est identique d'un client à l'autre e
 
 **Partagé — `packages/inline-core`, versionné (voir son CHANGELOG)**
 ```
+astro/                    Intégration Astro : /admin, /aide, overlay, amorce
+components/               Editable, Media, Collection
+pages/                    /admin et /aide, clé en main
 src/schema.ts             Schémas Zod — source de vérité du modèle
 src/style-tokens.ts       Variantes autorisées, source unique
 src/safe-href.ts          Ce qu'est un lien sûr, des deux côtés
@@ -55,20 +58,21 @@ styles/tokens.css         Enums du schéma → variables du thème
     config.ts             Déclaration de la collection
     site.json             Config globale : langues, navigation, pied de page
     /pages/{lang}/*.json  Contenu par page et par locale
-  /components             Composants .astro — statiques par défaut
+  /components             Les composants propres au site — statiques par défaut
   /layouts
   /lib/locales.ts         Les langues de CE site
   /media                  Images téléversées — dans src/, pour qu'`<Image />` les traite au build
   /styles/theme.css       La charte du client
-  /pages/[lang]/[...slug].astro, admin.astro, aide.astro
+  /pages/[lang]/[...slug].astro
 /functions/api/*.ts       Quatre adaptateurs de trois lignes, jamais de règle
 /scripts
   check-html.mjs          CI : vérifie que le contenu est dans le HTML brut
   check-locales.mjs       CI : parité des clés entre locales
   check-logs.mjs          CI : aucun secret dans un appel à console.*
   check-secrets.mjs       CI : aucun secret dans le dossier de build
-  create-site.mjs         Prépare un nouveau site : clé, empreinte, variables
+  create-site.mjs         Régénère les accès d'un site : clé, empreinte, variables
   bootstrap.mjs           Extrait le contenu d'une page HTML déjà annotée
+/packages/create-inline   npm create inline@latest <dossier>
 /docs                     nouveau-site, migration, formation-client
 ```
 

@@ -1,0 +1,18 @@
+{
+  "name": "create-inline",
+  "version": "1.0.0",
+  "description": "Cree un site inline pret a editer.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "bin": {
+    "create-inline": "index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "modele",
+    "README.md"
+  ],
+  "dependencies": {
+    "@noble/hashes": "^2.3.0"
+  }
+}

@@ -1,16 +1,25 @@
 {
   "name": "inline-core",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Edition de contenu en front pour sites statiques — la partie partagee entre tous les sites.",
   "type": "module",
   "license": "UNLICENSED",
   "files": [
+    "astro",
+    "components",
+    "pages",
     "src",
     "styles",
     "README.md",
     "CHANGELOG.md"
   ],
   "exports": {
+    "./astro": "./astro/index.ts",
+    "./pages/admin.astro": "./pages/admin.astro",
+    "./pages/aide.astro": "./pages/aide.astro",
+    "./components/Editable.astro": "./components/Editable.astro",
+    "./components/Media.astro": "./components/Media.astro",
+    "./components/Collection.astro": "./components/Collection.astro",
     "./schema": "./src/schema.ts",
     "./style-tokens": "./src/style-tokens.ts",
     "./safe-href": "./src/safe-href.ts",
@@ -21,10 +30,14 @@
     "./styles/tokens.css": "./styles/tokens.css"
   },
   "dependencies": {
+    "esbuild": "^0.28.2",
     "@noble/hashes": "^2.3.0",
     "dompurify": "^3.4.13",
     "htmlparser2": "^12.0.0",
     "libheif-js": "^1.19.8",
     "zod": "^3.24.1"
+  },
+  "peerDependencies": {
+    "astro": "^5.0.0"
   }
 }

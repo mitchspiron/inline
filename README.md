@@ -13,9 +13,14 @@ le site se reconstruit dans la minute.
 listes, multilingue, durcissement, industrialisation. Le périmètre v1 est
 gelé — voir *Hors périmètre*.
 
-La partie partagée entre tous les sites vit dans
-[packages/inline-core](packages/inline-core), versionnée. Le reste de ce dépôt
-est le **dépôt modèle** dont part chaque nouveau site.
+Un nouveau projet démarre en une commande :
+
+```bash
+npm create inline@latest mon-site
+```
+
+La logique d'édition vit dans [inline-core](packages/inline-core), en
+dépendance versionnée. Ce dépôt en est le site de référence.
 
 ---
 
@@ -87,7 +92,8 @@ npm run build            # Build de production (échoue si le contenu est invali
 npm run serve:functions  # Site + fonctions : c'est ici qu'on édite en local
 npm run check            # HTML brut + parité des langues + journaux + aucun secret
 npm run test             # Git, authentification, durcissement, amorçage, assainissement, médias, HEIC, langues, overlay
-npm run create:site      # Prépare un nouveau site : clé, empreinte, variables, aide-mémoire
+npm run create:site      # Régénère les accès d'un site : clé, empreinte, variables
+npm run test:scaffold    # Crée un site de zéro, l'installe, le construit, le contrôle
 npm run bootstrap        # Extrait le contenu d'une page HTML déjà annotée
 npm run make:key         # Génère seulement une clé et son empreinte (rotation)
 npm run mock:git         # Faux service Git local, pour essayer sans dépôt
@@ -245,9 +251,12 @@ Le dépôt est séparé en deux, et c'est toute la question de l'exploitation :
 ce qui est identique d'un client à l'autre est **partagé et versionné**, ce qui
 lui appartient est copié puis adapté.
 
-**Partagé — [packages/inline-core](packages/inline-core), version 1.0.0**
+**Partagé — [packages/inline-core](packages/inline-core), version 2.0.0**
 
 ```
+astro/                     L'intégration Astro
+components/                Editable, Media, Collection
+pages/                     /admin et /aide, clé en main
 src/schema.ts              Schéma Zod — le build ET la fonction d'écriture
 src/style-tokens.ts        Les variantes autorisées, source unique
 src/safe-href.ts           Ce qu'est un lien sûr, des deux côtés
@@ -273,11 +282,9 @@ src/content/pages/{lang}/    Le contenu
 src/content/site.json        Navigation, coordonnées — structure, pas contenu
 src/lib/locales.ts           Les langues de CE site
 src/styles/theme.css         La charte : palette, échelle typographique, rythme
-src/components/              Editable, Media, Collection, et les vôtres
-src/layouts/Base.astro       Métadonnées, éléments partagés, amorce d'édition
+src/components/              Les vôtres — ceux d'inline viennent du paquet
+src/layouts/Base.astro       Métadonnées, éléments partagés
 src/pages/[lang]/            Les pages
-src/pages/admin.astro        La saisie de la clé, et rien d'autre
-src/pages/aide.astro         Le mode d'emploi du client, en une page
 src/media/                   Les images téléversées
 functions/api/*.ts           Quatre adaptateurs de trois lignes
 scripts/                     Contrôles et outils de test
@@ -440,10 +447,34 @@ serait servi tel quel, sans AVIF, sans jeu de largeurs, sans dimensions.
 
 ## Mettre en place un site
 
-Trois documents, dans l'ordre où on s'en sert :
+```bash
+npm create inline@latest mon-site
+cd mon-site && npm install
+npm run build && npm run serve:functions
+```
 
-- **[docs/nouveau-site.md](docs/nouveau-site.md)** — partir du dépôt modèle,
-  générer les accès, poser la charte, déployer, vérifier. Une à deux journées.
+La commande écrit le squelette, les quatre adaptateurs de routes, la charte, une
+page de contenu, les contrôles et l'intégration continue — puis affiche la clé
+du site, une fois. Elle **n'écrit pas** la logique d'édition : celle-ci arrive
+par `inline-core`. C'est toute la différence entre un échafaudage et un
+copier-coller : le jour d'un correctif de sécurité, un `npm update` suffit.
+
+Dans un projet Astro qui existe déjà :
+
+```js
+// astro.config.mjs
+import inline from 'inline-core/astro';
+
+export default defineConfig({
+  output: 'static',
+  integrations: [inline({ locales: ['fr'], support: { email: 'contact@agence.fr' } })],
+});
+```
+
+Trois documents pour la suite, dans l'ordre où on s'en sert :
+
+- **[docs/nouveau-site.md](docs/nouveau-site.md)** — de la commande de création
+  au site déployé : charte, contenu, variables, vérifications. Une journée.
 - **[docs/migration.md](docs/migration.md)** — reprendre un site statique
   existant. Annoter le HTML, puis `npm run bootstrap` en extrait le contenu.
   Page par page : rien n'oblige à tout convertir d'un coup.
@@ -591,3 +622,28 @@ du marché serait plus adapté.
   du cadre se retrouve coupé.
 - **Les listes se réordonnent avec « Monter » et « Descendre »**, pas au
   glisser-déposer.
+
+---
+
+## Les autres frameworks
+
+Astro accepte React, Vue, Svelte. `inline` aussi, à une condition qui n'est
+pas celle qu'on croit.
+
+**Un composant de framework rendu au build est parfaitement légitime**, même
+pour du contenu éditable : sans directive `client:*`, il produit du HTML
+statique comme un composant Astro, et l'overlay travaille dessus sans savoir ce
+qui l'a produit.
+
+**Ce qui casse, c'est l'hydratation d'une zone éditable**, pour deux raisons
+distinctes qu'il vaut mieux ne pas confondre :
+
+- `client:only` ne rend rien au build : le contenu n'est dans aucun HTML
+  servi, donc dans aucun index ;
+- `client:load` rend bien le contenu, mais le framework le **réaffiche** à
+  l'arrivée du JavaScript, ce qui efface les modifications que le client était
+  en train de faire. C'est la plus contraignante des deux, et elle ne se voit
+  pas dans la source.
+
+Une île hydratée qui n'englobe aucune zone éditable — un carousel, une carte,
+un filtre — ne pose aucun problème, et `npm run check` l'accepte.

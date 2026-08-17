@@ -1,14 +1,14 @@
 ---
-import 'inline-core/styles/tokens.css';
-import '../styles/theme.css';
-import { site } from '../content/site';
+import '../styles/tokens.css';
+import 'inline:theme';
+import { defaultLocale, support } from 'inline:config';
 
 // Une seule chose à faire sur cette page : entrer. Pas de tableau de bord,
 // pas de liste de pages, pas de vocabulaire technique.
 ---
 
 <!doctype html>
-<html lang={site.locale}>
+<html lang={defaultLocale}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -38,9 +38,16 @@ import { site } from '../content/site';
       </form>
 
       <p class="admin-help">
-        Première fois ? <a href="/aide">Voir comment modifier votre site</a>.<br />
-        Clé perdue ou plus valable ? Contactez-nous à
-        <a href={`mailto:${site.contact.email}`}>{site.contact.email}</a>.
+        Première fois ? <a href="/aide">Voir comment modifier votre site</a>.
+        {
+          support?.email && (
+            <>
+              <br />
+              Clé perdue ou plus valable ? Contactez-nous à
+              <a href={`mailto:${support.email}`}>{support.email}</a>.
+            </>
+          )
+        }
       </p>
     </main>
 

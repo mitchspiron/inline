@@ -8,7 +8,7 @@ export default defineConfig({
   // l'overlay. Elle refuse de démarrer si la sortie n'est pas statique.
   integrations: [
     inline({
-      locales: ['fr', 'en'],
+      locales: ['fr'],
       support: { email: 'bonjour@exemple.fr' },
     }),
   ],
@@ -27,7 +27,7 @@ export default defineConfig({
    * URL identiques.
    */
   i18n: {
-    locales: ['fr', 'en'],
+    locales: ['fr'],
     defaultLocale: 'fr',
     routing: {
       prefixDefaultLocale: true,

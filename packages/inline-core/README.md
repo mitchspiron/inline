@@ -13,9 +13,57 @@ question « quelle version tourne chez ce client ? » ait une réponse.
 
 ---
 
+## Démarrer
+
+```bash
+npm create inline@latest mon-site
+```
+
+Ou, dans un projet Astro existant :
+
+```bash
+npm install inline-core
+```
+
+```js
+// astro.config.mjs
+import { defineConfig } from 'astro/config';
+import inline from 'inline-core/astro';
+
+export default defineConfig({
+  output: 'static',
+  integrations: [
+    inline({
+      locales: ['fr'],
+      support: { email: 'contact@agence.fr' },
+    }),
+  ],
+});
+```
+
+L'intégration pose `/admin` et `/aide`, construit l'overlay, injecte
+l'amorce d'édition, et refuse de démarrer si la sortie n'est pas statique.
+Restent à écrire : les quatre adaptateurs de `/functions` — l'hébergeur les
+lit à la racine du dépôt, hors du build Astro, une intégration ne peut pas les
+injecter. Vingt lignes, écrites une fois.
+
+### Options
+
+| Option | Rôle |
+|---|---|
+| `locales` | Codes des langues, la référence en premier. Obligatoire. |
+| `support` | Adresse affichée au client sur `/admin` et `/aide`. |
+| `theme` | Chemin de la charte. Défaut : `src/styles/theme.css`. |
+| `pages` | `{ admin: false }` pour fournir la sienne. |
+
+---
+
 ## Ce que le paquet fournit
 
 ```
+astro/                 L'intégration Astro
+components/            Editable, Media, Collection
+pages/                 /admin et /aide, clé en main
 src/schema.ts          Le modèle de contenu (Zod) — build ET fonction serveur
 src/style-tokens.ts    Les variantes autorisées, source unique
 src/safe-href.ts       Ce qu'est un lien sûr, des deux côtés
@@ -83,20 +131,43 @@ donneraient un contenu valide qui ne s'affiche pas.
 
 ### L'overlay
 
-Il n'est jamais importé par le site : il se construit à part et se charge
-uniquement quand le témoin d'édition est posé.
+Il n'est jamais importé par le site : l'intégration le construit à part, et il
+se charge uniquement quand le témoin d'édition est posé. Même adresse en
+développement et en production — `/editor/overlay.js` — servie par un
+intermédiaire de développement plutôt que par un chemin qui dépendrait de
+l'endroit d'où le paquet est chargé.
 
-```json
-"bundle:editor": "esbuild packages/inline-core/src/editor/index.ts --bundle --minify --format=esm --target=es2020 --splitting --outdir=dist/editor --entry-names=overlay --chunk-names=[name]-[hash]"
-```
-
-Le découpage (`--splitting`) n'est pas cosmétique : l'assainisseur et le
-décodeur d'images d'iPhone ne se téléchargent qu'au moment où ils servent. Sans
-lui, l'overlay dépasse largement son budget.
+Le découpage n'est pas cosmétique : l'assainisseur et le décodeur d'images
+d'iPhone ne se téléchargent qu'au moment où ils servent. Sans lui, l'overlay
+dépasse largement son budget.
 
 **L'overlay ne connaît pas les langues du site.** Quelles langues existent,
 comment elles s'appellent et à quelle adresse elles répondent sont des
 décisions du site : il les lit sur `data-cms-locales`, posé au build.
+
+### Les autres frameworks
+
+Astro accepte React, Vue, Svelte. `inline` aussi, à une condition qui n'est
+pas celle qu'on croit.
+
+**Un composant de framework rendu au build est parfaitement légitime**, même
+pour du contenu éditable : sans directive `client:*`, il produit du HTML
+statique comme un composant Astro, le `data-cms` se retrouve dans la page, et
+l'overlay travaille dessus sans savoir ce qui l'a produit.
+
+**Ce qui casse, c'est l'hydratation d'une zone éditable**, pour deux raisons
+distinctes :
+
+- `client:only` ne rend rien au build — le contenu n'est dans aucun HTML
+  servi, donc dans aucun index ;
+- `client:load` rend bien le contenu, mais le framework le **réaffiche** à
+  l'arrivée du JavaScript, ce qui efface les modifications que le client était
+  en train de faire. C'est la plus contraignante des deux, et elle ne se voit
+  pas dans la source.
+
+Une île hydratée qui n'englobe aucune zone éditable — un carousel, une carte,
+un filtre — ne pose aucun problème. `check-html.mjs` applique exactement cette
+règle.
 
 ---
 

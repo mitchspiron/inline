@@ -11,11 +11,13 @@
  * du corps ne protège de rien.
  */
 import { build } from 'esbuild';
+import { readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { findLeaks, evaluatedPart } from './check-logs.mjs';
+import { hydratedIslands } from './check-html.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 let failures = 0;
@@ -354,6 +356,54 @@ check(
   'la ligne fautive est signalée',
   findLeaks('const a = 1;\nconsole.error(token);')[0]?.line === 2,
 );
+
+// --- Hydratation -------------------------------------------------------------
+console.log('\nHydratation');
+
+/** Ce que produit Astro pour un composant de framework hydraté. */
+const island = (inner, directive = 'load') =>
+  `<astro-island uid="x" client="${directive}" component-url="/_astro/C.js">${inner}</astro-island>`;
+
+/** Le contrôle tel qu'il est appliqué dans check-html.mjs. */
+const editableInsideIsland = (html) =>
+  hydratedIslands(html).some((zone) => /data-cms(?:-list)?="/.test(zone));
+
+check(
+  'une zone éditable dans une île hydratée est refusée',
+  editableInsideIsland(`<main>${island('<h1 data-cms="blocks.hero.title">Titre</h1>')}</main>`),
+);
+check(
+  'une liste éditable dans une île hydratée est refusée aussi',
+  editableInsideIsland(island('<div data-cms-list="collections.avis"></div>')),
+);
+check(
+  'une île sans zone éditable est acceptée',
+  !editableInsideIsland(`<h1 data-cms="blocks.hero.title">Titre</h1>${island('<div class="carousel"></div>')}`),
+);
+check(
+  'une page sans île du tout est acceptée',
+  !editableInsideIsland('<h1 data-cms="blocks.hero.title">Titre</h1>'),
+);
+check(
+  'une zone éditable juste après une île fermée est acceptée',
+  !editableInsideIsland(`${island('<div class="carte"></div>')}<p data-cms="blocks.about.body">Texte</p>`),
+);
+check(
+  'deux îles sont examinées séparément',
+  editableInsideIsland(
+    `${island('<div class="carte"></div>')}${island('<p data-cms="blocks.about.body">Texte</p>')}`,
+  ),
+);
+check(
+  'une île non fermée est examinée jusqu\'au bout du document',
+  editableInsideIsland('<astro-island client="load"><p data-cms="blocks.a.b">x</p>'),
+);
+check('le découpage compte les îles', hydratedIslands(`${island('a')}${island('b')}`).length === 2);
+
+// Le HTML réellement construit ne doit contenir aucune île : le site modèle
+// n'utilise aucun composant de framework.
+const built = readFileSync(join(root, 'dist/fr/index.html'), 'utf8');
+check('la page construite ne contient aucune île', hydratedIslands(built).length === 0);
 
 await rm(workspace, { recursive: true, force: true });
 

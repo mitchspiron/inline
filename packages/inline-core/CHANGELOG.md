@@ -9,6 +9,45 @@ Versionnage sémantique, avec une règle qui lui est propre :
 
 ---
 
+## 2.0.0
+
+`inline-core` devient utilisable depuis n'importe quel projet Astro : une
+intégration, des composants, une commande de création. Avant, démarrer un site
+voulait dire recopier une liste de fichiers depuis un dépôt de référence.
+
+Le saut de version majeure est une affaire de rigueur, pas de migration :
+la 1.0.0 n'a jamais quitté le dépôt, aucun site ne la consomme.
+
+### Ajouté
+
+- **Intégration Astro** (`inline-core/astro`). Elle pose `/admin` et
+  `/aide`, construit l'overlay en dev comme en production, injecte l'amorce
+  d'édition, et **refuse de démarrer si la sortie n'est pas statique**. Un site
+  déclare ses langues et sa charte, rien d'autre.
+- **Composants** (`inline-core/components/*.astro`) : `Editable`, `Media`
+  et `Collection` ne sont plus recopiés site par site. C'était la dernière
+  duplication qui subsistait.
+- **Pages clé en main** : `/admin` et `/aide`, habillées par la charte du
+  site. Un site qui veut les siennes passe `pages: { admin: false }`.
+- **`create-inline`** : `npm create inline@latest mon-site` produit un site
+  qui construit, avec sa clé, en une commande.
+
+### Changé
+
+- **`isAllowedPath(path, locales)`** prend désormais les langues en
+  paramètre : le paquet ne peut pas les deviner, et une liste figée dans le
+  code partagé serait une décision du site prise au mauvais endroit.
+- **L'overlay lit les libellés de langue sur la page** (`data-cms-locales`)
+  au lieu de les importer. Un paquet partagé ne peut pas connaître les langues
+  d'un site en particulier.
+- **Le contrôle d'hydratation porte sur les zones éditables**, plus sur la page
+  entière. Un composant React, Vue ou Svelte rendu au build est légitime ; une
+  île hydratée qui n'englobe aucune zone éditable aussi. Ce qui reste refusé,
+  c'est une zone éditable **à l'intérieur** d'une île : le framework la
+  réaffiche au chargement et efface les modifications en cours.
+
+---
+
 ## 1.0.0
 
 Première version publiable. Ce qui était réparti entre `src/` et `functions/`

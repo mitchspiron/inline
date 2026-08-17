@@ -93,13 +93,14 @@ const missing = new Set(untranslated);
     </section>
 
     <section class="showcase">
-      <Media
-        data={data}
-        path="blocks.showcase.visual"
-        widths={[480, 800, 1200, 1600]}
-        sizes="(max-width: 48rem) 100vw, 48rem"
-        untranslated={missing}
-      />
+      {/*
+        Une image se pose de la même façon :
+          <Media data={data} path="blocks.showcase.visual"
+                 widths={[480, 800, 1200, 1600]}
+                 sizes="(max-width: 48rem) 100vw, 48rem" />
+        Déposez le fichier dans src/media/, ajoutez le champ au contenu, et
+        <Image /> produira AVIF, WebP et le jeu de largeurs au build.
+      */}
       <Media data={data} path="blocks.showcase.film" untranslated={missing} />
     </section>
   </main>

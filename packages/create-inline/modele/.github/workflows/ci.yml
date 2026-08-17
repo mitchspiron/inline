@@ -48,27 +48,3 @@ jobs:
       # aucun secret dans le build.
       - name: Contrôles du site construit
         run: npm run check
-
-  # Un site créé de zéro construit-il et passe-t-il ses contrôles ?
-  #
-  # Séparé du reste parce qu'il installe un projet neuf : quelques minutes,
-  # dont on ne veut pas retarder les tests rapides. Sans ce travail, le modèle
-  # embarqué par create-inline diverge en silence du dépôt de référence, et on
-  # ne s'en aperçoit qu'au prochain client.
-  echafaudage:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Installer les dépendances
-        run: npm ci
-
-      - name: Créer un site, l'installer, le construire, le contrôler
-        run: npm run test:scaffold
