@@ -24,7 +24,21 @@ export interface Ui {
   clearBanner(): void;
 }
 
-export function mountUi(handlers: { onPublish: () => void; onReset: () => void }): Ui {
+export interface LocaleLink {
+  locale: string;
+  label: string;
+  href: string;
+  current: boolean;
+}
+
+export function mountUi(handlers: {
+  onPublish: () => void;
+  onReset: () => void;
+  /** Les langues du site, telles que déclarées par la page. */
+  locales?: LocaleLink[];
+  /** Nombre de champs affichés dans la langue par défaut, faute de traduction. */
+  untranslated?: number;
+}): Ui {
   const style = document.createElement('style');
   style.textContent = OVERLAY_CSS;
   document.head.appendChild(style);
@@ -59,6 +73,39 @@ export function mountUi(handlers: { onPublish: () => void; onReset: () => void }
   publish.textContent = 'Publier';
   publish.disabled = true;
   publish.addEventListener('click', handlers.onPublish);
+
+  /**
+   * Choix de la langue : de vrais liens vers de vraies URL.
+   *
+   * Aucune bascule par JavaScript, ici pas plus qu'ailleurs — changer de langue,
+   * c'est changer de page.
+   */
+  const locales = handlers.locales ?? [];
+  if (locales.length > 1) {
+    const group = document.createElement('span');
+    group.className = 'cms-ui-langs';
+    for (const entry of locales) {
+      const link = document.createElement('a');
+      link.href = entry.href;
+      link.hreflang = entry.locale;
+      link.textContent = entry.label;
+      if (entry.current) link.setAttribute('aria-current', 'true');
+      group.appendChild(link);
+    }
+    bar.appendChild(group);
+  }
+
+  const pending = handlers.untranslated ?? 0;
+  if (pending > 0) {
+    const notice = document.createElement('span');
+    notice.className = 'cms-ui-pending';
+    notice.textContent =
+      pending === 1
+        ? '1 texte reste à traduire sur cette page'
+        : `${pending} textes restent à traduire sur cette page`;
+    notice.title = "Ces textes s'affichent pour l'instant dans la langue principale.";
+    bar.appendChild(notice);
+  }
 
   bar.append(status, reset, publish);
   document.body.appendChild(bar);

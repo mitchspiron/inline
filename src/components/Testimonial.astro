@@ -6,9 +6,10 @@ interface Props {
   item: CollectionItem;
   /** Chemin de l'item, ex. « collections.testimonials.t-001 ». */
   path: string;
+  untranslated?: Set<string>;
 }
 
-const { item, path } = Astro.props;
+const { item, path, untranslated } = Astro.props;
 ---
 
 {/*
@@ -18,6 +19,6 @@ const { item, path } = Astro.props;
   — il n'y a pas de second rendu à tenir d'accord.
 */}
 <blockquote>
-  <Editable path={`${path}.quote`} field={item.quote as any} as="p" class="testimonial-quote" />
-  <Editable path={`${path}.author`} field={item.author as any} as="footer" class="testimonial-author" />
+  <Editable path={`${path}.quote`} field={item.quote as any} as="p" class="testimonial-quote" untranslated={untranslated} />
+  <Editable path={`${path}.author`} field={item.author as any} as="footer" class="testimonial-author" untranslated={untranslated} />
 </blockquote>

@@ -1,0 +1,106 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import Editable from '../../components/Editable.astro';
+import Media from '../../components/Media.astro';
+import Collection from '../../components/Collection.astro';
+import Testimonial from '../../components/Testimonial.astro';
+import type { Page } from '../../content/schema';
+import { DEFAULT_LOCALE, LOCALES, localePath, mergeWithDefault } from '../../lib/locales';
+
+/**
+ * Une URL par langue et par page, toutes construites au build.
+ *
+ * La liste des pages vient de la langue par défaut : c'est elle qui fait
+ * référence. Une page traduite sans équivalent dans la langue par défaut ne
+ * serait rattachée à rien.
+ */
+export async function getStaticPaths() {
+  const entries = await getCollection('pages');
+  const byId = new Map(entries.map((entry) => [entry.id, entry]));
+
+  const pages = entries
+    .filter((entry) => entry.id.startsWith(`${DEFAULT_LOCALE}/`))
+    .map((entry) => entry.id.slice(DEFAULT_LOCALE.length + 1));
+
+  return LOCALES.flatMap((locale) =>
+    pages.map((page) => {
+      const reference = byId.get(`${DEFAULT_LOCALE}/${page}`)!;
+      const translation = byId.get(`${locale}/${page}`);
+      const { data, untranslated } = mergeWithDefault<Page>(
+        reference.data as Page,
+        translation?.data as Page | undefined,
+      );
+
+      return {
+        // « home » est la page d'accueil de sa langue : pas de segment de plus.
+        params: { lang: locale, slug: page === 'home' ? undefined : page },
+        props: { locale, page, data, untranslated },
+      };
+    }),
+  );
+}
+
+const { locale, page, data, untranslated } = Astro.props;
+
+/** Les autres langues, pour les liens réciproques. */
+const alternates = LOCALES.map((code) => ({ locale: code, href: localePath(code, page) }));
+
+/** Un champ est-il repris de la langue par défaut ? */
+const missing = new Set(untranslated);
+---
+
+<Base
+  title={data.meta.title}
+  description={data.meta.description}
+  contentFile={`src/content/pages/${locale}/${page}.json`}
+  locale={locale}
+  pageName={page}
+  alternates={alternates}
+  untranslated={untranslated.length}
+>
+  <main class="page">
+    <section class="hero">
+      <Editable data={data} path="blocks.hero.title" as="h1" untranslated={missing} />
+      <Editable data={data} path="blocks.hero.subtitle" as="p" untranslated={missing} />
+      <Editable data={data} path="blocks.hero.cta" as="p" untranslated={missing} />
+    </section>
+
+    <section>
+      <Editable data={data} path="blocks.pitch.body" as="p" untranslated={missing} />
+      <Editable data={data} path="blocks.pitch.detail" as="p" untranslated={missing} />
+    </section>
+
+    <section class="testimonials">
+      <Collection
+        data={data}
+        name="testimonials"
+        item={Testimonial}
+        untranslated={missing}
+        blank={{
+          quote: {
+            type: 'text',
+            value: 'Leur retour, en une phrase.',
+            style: { size: 'lg', weight: 'regular', italic: true, align: 'left', color: 'primary' },
+          },
+          author: {
+            type: 'text',
+            value: 'Prénom N., fonction',
+            style: { size: 'sm', weight: 'medium', italic: false, align: 'left', color: 'muted' },
+          },
+        }}
+      />
+    </section>
+
+    <section class="showcase">
+      <Media
+        data={data}
+        path="blocks.showcase.visual"
+        widths={[480, 800, 1200, 1600]}
+        sizes="(max-width: 48rem) 100vw, 48rem"
+        untranslated={missing}
+      />
+      <Media data={data} path="blocks.showcase.film" untranslated={missing} />
+    </section>
+  </main>
+</Base>

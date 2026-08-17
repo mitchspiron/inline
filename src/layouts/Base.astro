@@ -1,6 +1,7 @@
 ---
 import '../styles/tokens.css';
 import { site } from '../content/site';
+import { DEFAULT_LOCALE, LOCALE_LABELS, localePath } from '../lib/locales';
 
 interface Props {
   title: string;
@@ -9,10 +10,35 @@ interface Props {
   contentFile: string;
   locale: string;
   pageName: string;
+  /** Adresses de la même page dans les autres langues. */
+  alternates?: Array<{ locale: string; href: string }>;
+  /** Nombre de champs repris de la langue par défaut. */
+  untranslated?: number;
 }
 
-const { title, description, contentFile, locale, pageName } = Astro.props;
+const {
+  title,
+  description,
+  contentFile,
+  locale,
+  pageName,
+  alternates = [],
+  untranslated = 0,
+} = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
+
+/**
+ * Liens réciproques entre langues, plus `x-default`.
+ *
+ * Chaque page se déclare elle-même en plus de ses traductions : c'est la
+ * réciprocité qu'attendent les moteurs, une page qui ne se cite pas est
+ * ignorée du groupe.
+ */
+const hreflangs = alternates.map((entry) => ({
+  hreflang: entry.locale,
+  href: new URL(entry.href, Astro.site).href,
+}));
+const defaultAlternate = alternates.find((entry) => entry.locale === DEFAULT_LOCALE);
 
 /**
  * En développement, l'overlay est servi par Vite depuis les sources ;
@@ -32,8 +58,39 @@ const overlaySrc = import.meta.env.DEV ? '/src/editor/index.ts' : '/editor/overl
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
+    {hreflangs.map((entry) => <link rel="alternate" hreflang={entry.hreflang} href={entry.href} />)}
+    {
+      defaultAlternate && (
+        <link
+          rel="alternate"
+          hreflang="x-default"
+          href={new URL(defaultAlternate.href, Astro.site).href}
+        />
+      )
+    }
   </head>
-  <body data-cms-file={contentFile} data-cms-locale={locale} data-cms-page={pageName}>
+  <body
+    data-cms-file={contentFile}
+    data-cms-locale={locale}
+    data-cms-page={pageName}
+    data-cms-untranslated={untranslated > 0 ? String(untranslated) : undefined}
+    data-cms-locales={alternates.map((entry) => `${entry.locale}:${entry.href}`).join(',')}
+  >
+    <nav class="site-langs" aria-label="Langues">
+      {
+        alternates.map((entry) => (
+          <a
+            href={entry.href}
+            hreflang={entry.locale}
+            lang={entry.locale}
+            aria-current={entry.locale === locale ? 'true' : undefined}
+          >
+            {LOCALE_LABELS[entry.locale as keyof typeof LOCALE_LABELS] ?? entry.locale}
+          </a>
+        ))
+      }
+    </nav>
+
     <nav class="site-nav">
       {site.navigation.map((item) => <a href={item.href}>{item.label}</a>)}
     </nav>

@@ -8,4 +8,25 @@ export default defineConfig({
   build: {
     format: 'directory',
   },
+
+  /**
+   * Une URL par langue, préfixe compris pour la langue par défaut.
+   *
+   * `prefixDefaultLocale: true` évite la page servie sous deux adresses — la
+   * racine et le préfixe — qui obligerait à arbitrer une canonique entre deux
+   * URL identiques.
+   */
+  i18n: {
+    locales: ['fr', 'en'],
+    defaultLocale: 'fr',
+    routing: {
+      prefixDefaultLocale: true,
+    },
+  },
+
+  // La racine mène à la langue par défaut. Redirection émise au build, sans
+  // une ligne de JavaScript.
+  redirects: {
+    '/': '/fr/',
+  },
 });

@@ -22,6 +22,7 @@ import {
   type ListZone,
 } from './collection';
 import { embedUrl } from '../lib/video';
+import { LOCALE_LABELS } from '../lib/locales';
 import { loadSanitizer, sanitizeRichtext, sanitizeText } from './sanitize';
 import { createToolbar, type RichCommand, type StyleChange } from './toolbar';
 import {
@@ -141,7 +142,29 @@ function start(context: Context): void {
   let saveTimer: number | undefined;
   let active: Zone | null = null;
 
-  const ui: Ui = mountUi({ onPublish: doPublish, onReset: doReset });
+  /**
+   * Les langues déclarées par la page. L'overlay ne les devine pas : il lit ce
+   * que le build a posé, donc exactement les URL qui existent.
+   */
+  const localeLinks = (document.body.dataset.cmsLocales ?? '')
+    .split(',')
+    .filter(Boolean)
+    .map((entry) => {
+      const [code, href] = entry.split(':');
+      return {
+        locale: code,
+        href,
+        label: LOCALE_LABELS[code as keyof typeof LOCALE_LABELS] ?? code,
+        current: code === context.locale,
+      };
+    });
+
+  const ui: Ui = mountUi({
+    onPublish: doPublish,
+    onReset: doReset,
+    locales: localeLinks,
+    untranslated: Number(document.body.dataset.cmsUntranslated ?? 0),
+  });
   const toolbar = createToolbar({ onStyle: applyStyleChange, onCommand: runCommand });
 
   const mediaPanel = createMediaPanel({

@@ -15,9 +15,10 @@ import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** Lot 0 : une page. La table s'étendra avec le routage multilingue. */
+/** Une entrée par page construite, toutes langues confondues. */
 const PAGES = [
-  { content: 'src/content/pages/fr/home.json', html: 'dist/index.html' },
+  { content: 'src/content/pages/fr/home.json', html: 'dist/fr/index.html' },
+  { content: 'src/content/pages/en/home.json', html: 'dist/en/index.html' },
 ];
 
 const errors = [];

@@ -18,6 +18,12 @@ export const OVERLAY_CSS = `
   box-shadow: 0 8px 28px rgba(16,24,40,.28);
 }
 .cms-ui-status { opacity: .85; white-space: nowrap; }
+.cms-ui-langs { display: flex; gap: 8px; padding-right: 12px; border-right: 1px solid #344054; }
+.cms-ui-langs a { color: #98a2b3; text-decoration: none; }
+.cms-ui-langs a:hover { color: #fff; }
+.cms-ui-langs a[aria-current=true] { color: #fff; font-weight: 600; }
+.cms-ui-pending { color: #fdb022; white-space: nowrap; }
+.cms-ui-on [data-cms-untranslated=true] { outline-color: #fdb022 !important; }
 .cms-ui-status[data-dirty="true"] { opacity: 1; font-weight: 600; }
 .cms-ui-btn {
   border: 0; border-radius: 8px; padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer;

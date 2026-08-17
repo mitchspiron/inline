@@ -10,9 +10,11 @@ interface Props {
   /** Largeurs proposées au navigateur. Structure : développeur. */
   widths?: number[];
   sizes?: string;
+  untranslated?: Set<string>;
 }
 
-const { data, path, class: extraClass = '', widths, sizes } = Astro.props;
+const { data, path, class: extraClass = '', widths, sizes, untranslated } = Astro.props;
+const pending = untranslated?.has(path) ? 'true' : undefined;
 
 function resolveField(source: unknown, keyPath: string): ImageField | VideoField {
   const node = keyPath
@@ -70,6 +72,7 @@ const field = resolveField(data, path);
       data-cms={path}
       data-cms-type="media"
       data-cms-kind="image"
+      data-cms-untranslated={pending}
     />
   ) : (
     /*
@@ -82,6 +85,7 @@ const field = resolveField(data, path);
       data-cms={path}
       data-cms-type="media"
       data-cms-kind="video"
+      data-cms-untranslated={pending}
       data-cms-provider={field.provider}
       data-cms-video-id={field.videoId}
     >

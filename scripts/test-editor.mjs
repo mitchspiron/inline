@@ -19,7 +19,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const HTML = join(root, 'dist/index.html');
+const HTML = join(root, 'dist/fr/index.html');
 const CONTENT = join(root, 'src/content/pages/fr/home.json');
 const FILE = 'src/content/pages/fr/home.json';
 
@@ -30,13 +30,13 @@ function check(label, ok, detail = '') {
 }
 
 if (!existsSync(HTML)) {
-  console.error('  ✗ dist/index.html absent — lancer « npm run build » d\'abord.');
+  console.error('  ✗ dist/fr/index.html absent — lancer « npm run build » d\'abord.');
   process.exit(1);
 }
 
 const html = await readFile(HTML, 'utf8');
 if (!html.includes('data-cms-file')) {
-  console.error('  ✗ dist/index.html ne porte pas les points d\'ancrage — relancer « npm run build ».');
+  console.error('  ✗ dist/fr/index.html ne porte pas les points d\'ancrage — relancer « npm run build ».');
   process.exit(1);
 }
 
@@ -53,11 +53,11 @@ const overlay = (
 const repoContent = await readFile(CONTENT, 'utf8');
 
 /** Ouvre la page dans un DOM neuf, avec un faux serveur et un stockage partagé. */
-async function openPage({ storage = new Map(), content = repoContent, version = 'v1' } = {}) {
+async function openPage({ storage = new Map(), content = repoContent, version = 'v1', markup = html } = {}) {
   const calls = [];
   // « outside-only » : le script de la page n'est pas chargé tout seul, c'est
   // nous qui injectons le bundle de l'overlay dans le contexte de la fenêtre.
-  const dom = new JSDOM(html, {
+  const dom = new JSDOM(markup, {
     url: 'https://exemple.fr/',
     pretendToBeVisual: true,
     runScripts: 'outside-only',
@@ -494,6 +494,41 @@ check('un item est bien ajouté avant l\'annulation', ids(resetDoc).length === 3
 buttonByText(resetDoc, 'Annuler mes modifications').click();
 await new Promise((resolve) => setTimeout(resolve, 100));
 check('annuler rend à la liste sa composition d\'origine', ids(resetDoc).join(',') === 't-001,t-002', ids(resetDoc).join(','));
+
+// --- Langues ------------------------------------------------------------------
+console.log('\nLangues');
+
+const langPage = await openPage();
+const langLinks = [...langPage.document.querySelectorAll('.cms-ui-langs a')];
+
+check('la barre propose les langues du site', langLinks.length === 2, String(langLinks.length));
+check(
+  'ce sont de vrais liens vers de vraies adresses',
+  langLinks.map((a) => a.getAttribute('href')).join(',') === '/fr/,/en/',
+  langLinks.map((a) => a.getAttribute('href')).join(','),
+);
+check(
+  'la langue courante est signalée',
+  langLinks.filter((a) => a.getAttribute('aria-current') === 'true').length === 1,
+);
+check(
+  'les langues sont nommées, pas codées',
+  langLinks.map((a) => a.textContent).join(',') === 'Français,English',
+  langLinks.map((a) => a.textContent).join(','),
+);
+check('aucun compteur quand tout est traduit', !langPage.document.querySelector('.cms-ui-pending'));
+
+// Une page dont deux textes ne sont pas traduits.
+const pendingMarkup = html.replace('<body ', '<body data-cms-untranslated="2" ');
+const pendingPage = await openPage({ markup: pendingMarkup });
+const pendingNotice = pendingPage.document.querySelector('.cms-ui-pending');
+check('le nombre de textes à traduire est affiché', !!pendingNotice, 'absent');
+check(
+  'il est formulé en langage courant, sans jargon',
+  /2 textes restent à traduire/.test(pendingNotice?.textContent ?? '') &&
+    !/(locale|i18n|clé|json)/i.test(pendingNotice?.textContent ?? ''),
+  pendingNotice?.textContent,
+);
 
 if (failures > 0) {
   console.error(`\n${failures} contrôle(s) en échec.\n`);

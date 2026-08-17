@@ -15,9 +15,22 @@ interface Props {
   /** Balise de rendu. */
   as?: keyof HTMLElementTagNameMap;
   class?: string;
+  /** Chemins repris de la langue par défaut, faute de traduction. */
+  untranslated?: Set<string>;
 }
 
-const { data, path, field: given, as: Tag = 'p', class: extraClass = '' } = Astro.props;
+const {
+  data,
+  path,
+  field: given,
+  as: Tag = 'p',
+  class: extraClass = '',
+  untranslated,
+} = Astro.props;
+
+// Marqué, jamais masqué : le texte de référence s'affiche, et l'overlay le
+// signale. Un visiteur voit une page complète, l'éditeur voit le travail restant.
+const pending = untranslated?.has(path) ? 'true' : undefined;
 
 /**
  * Résout le chemin dans le JSON. Un `data-cms` qui pointe vers une clé absente
@@ -57,9 +70,15 @@ const classes = [
 {/* Rendu statique pur : aucune directive client:*, la valeur est dans le HTML brut. */}
 {
   field.type === 'richtext' ? (
-    <Tag data-cms={path} data-cms-type="richtext" class={classes} set:html={field.value} />
+    <Tag
+      data-cms={path}
+      data-cms-type="richtext"
+      data-cms-untranslated={pending}
+      class={classes}
+      set:html={field.value}
+    />
   ) : (
-    <Tag data-cms={path} data-cms-type="text" class={classes}>
+    <Tag data-cms={path} data-cms-type="text" data-cms-untranslated={pending} class={classes}>
       {field.value}
     </Tag>
   )

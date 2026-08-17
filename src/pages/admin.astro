@@ -129,7 +129,7 @@ import { site } from '../content/site';
           });
 
           if (response.ok) {
-            window.location.href = '/';
+            window.location.href = '/' + document.documentElement.lang + '/';
             return;
           }
 

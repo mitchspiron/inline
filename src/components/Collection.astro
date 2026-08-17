@@ -14,9 +14,10 @@ interface Props {
    */
   blank: Omit<CollectionItem, 'id'>;
   class?: string;
+  untranslated?: Set<string>;
 }
 
-const { data, name, item: Item, blank, class: extraClass = '' } = Astro.props;
+const { data, name, item: Item, blank, class: extraClass = '', untranslated } = Astro.props;
 
 const path = `collections.${name}`;
 const items = (data.collections?.[name] ?? []) as CollectionItem[];
@@ -39,7 +40,7 @@ for (const entry of items) {
   {
     items.map((entry) => (
       <article data-cms-item={entry.id}>
-        <Item item={entry} path={`${path}.${entry.id}`} />
+        <Item item={entry} path={`${path}.${entry.id}`} untranslated={untranslated} />
       </article>
     ))
   }

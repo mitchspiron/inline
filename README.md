@@ -9,9 +9,9 @@ Le client reçoit une URL, `monsite.fr/admin`, et une clé. Il entre, il modifie
 ses textes sur ses propres pages, il publie. Chaque publication est un commit ;
 le site se reconstruit dans la minute.
 
-**État : lots 0 à 4 livrés.** Une page, une langue : textes, richtext, images,
-vidéos et listes. Le multilingue arrive avec son lot — voir *Ce qui n'est pas
-encore là*.
+**État : lots 0 à 5 livrés.** Textes, richtext, images, vidéos, listes et
+multilingue. Reste le durcissement et l'industrialisation — voir *Ce qui n'est
+pas encore là*.
 
 ---
 
@@ -79,8 +79,8 @@ d'autre.
 npm run dev              # Serveur Astro seul — le site, sans les fonctions ni l'édition
 npm run build            # Build de production (échoue si le contenu est invalide)
 npm run serve:functions  # Site + fonctions : c'est ici qu'on édite en local
-npm run check            # Contenu bien dans le HTML brut + aucun secret dans le build
-npm run test             # Fournisseur Git, authentification, assainissement, médias, HEIC, overlay
+npm run check            # Contenu dans le HTML brut + parité des langues + aucun secret
+npm run test             # Git, authentification, assainissement, médias, HEIC, langues, overlay
 npm run make:key         # Génère une clé de site, son empreinte, un secret de session
 npm run mock:git         # Faux service Git local, pour essayer sans dépôt
 ```
@@ -125,6 +125,51 @@ Ouvrez la page en édition, modifiez un texte sans publier. Modifiez le même
 fichier ailleurs. Publiez depuis le premier onglet : la publication est refusée,
 un message invite à recharger, et rien n'est écrasé. Après rechargement, le
 bandeau de reprise repropose vos modifications.
+
+---
+
+## Multilingue
+
+Une URL par langue, construite au build : `/fr/`, `/en/`. La racine redirige
+vers la langue de référence par une redirection émise au build — **aucune
+bascule de langue par JavaScript**, ni sur le site, ni dans l'overlay, où le
+choix de langue est fait de vrais liens.
+
+Un dossier JSON par langue :
+
+```
+src/content/pages/fr/home.json   la référence
+src/content/pages/en/home.json   la traduction
+```
+
+### Ce qui se passe quand une traduction manque
+
+Deux mécanismes, qui semblent se contredire et se complètent :
+
+- **La page reste consultable.** Un champ absent de la traduction est repris de
+  la langue de référence plutôt que de laisser un trou. Le champ est marqué,
+  et la barre de l'overlay affiche « 2 textes restent à traduire sur cette
+  page ».
+- **Rien ne part en silence.** `npm run check` échoue sur toute clé présente
+  dans une langue et absente d'une autre — dans les deux sens, y compris une
+  clé traduite qui n'existe pas dans la référence et ne serait jamais affichée.
+
+Le repli n'est donc pas une tolérance : c'est ce qui rend une page utilisable
+pendant qu'on la traduit, sans masquer le travail restant.
+
+Les items de liste se réconcilient **par identifiant** : une traduction peut
+ranger ses témoignages dans un autre ordre sans que les textes ne glissent d'un
+item à l'autre.
+
+### Ajouter une langue
+
+1. Déclarer le code dans `i18n.locales` d'[astro.config.mjs](astro.config.mjs)
+   et dans `LOCALES` de [src/lib/locales.ts](src/lib/locales.ts), avec son nom
+   dans `LOCALE_LABELS` — le client voit « Français », jamais « fr ».
+2. Ajouter le code à `LOCALES` de
+   [scripts/check-locales.mjs](scripts/check-locales.mjs).
+3. Créer `src/content/pages/{code}/`. Tant que les fichiers manquent, les pages
+   s'affichent dans la langue de référence et `npm run check` le signale.
 
 ---
 
@@ -403,7 +448,7 @@ Ce qui reste à faire : limitation de débit sur `/api/save` et `/api/upload`
 
 ## Ce qui n'est pas encore là
 
-Multilingue (lot 5).
+Durcissement (lot 6), industrialisation (lot 7).
 Les types correspondants existent déjà dans le schéma : le contenu qui les
 utilise sera validé, mais aucun composant ne les rend et aucun bouton ne les
 modifie.

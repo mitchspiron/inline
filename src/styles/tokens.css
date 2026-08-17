@@ -154,3 +154,22 @@ body {
 .testimonial-author {
   margin: 0;
 }
+
+.site-langs {
+  display: flex;
+  gap: var(--space-2);
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: var(--space-1) var(--space-3) 0;
+  font-size: var(--size-sm);
+}
+
+.site-langs a {
+  color: var(--color-muted);
+  text-decoration: none;
+}
+
+.site-langs a[aria-current='true'] {
+  color: var(--color-primary);
+  font-weight: var(--weight-semibold);
+}

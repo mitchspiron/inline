@@ -1,0 +1,125 @@
+{
+  "meta": {
+    "title": "Agency — Home",
+    "description": "Fast, durable showcase websites, built to last."
+  },
+  "blocks": {
+    "hero": {
+      "title": {
+        "type": "text",
+        "value": "We build websites that convert",
+        "style": {
+          "size": "3xl",
+          "weight": "bold",
+          "align": "center",
+          "color": "primary"
+        }
+      },
+      "subtitle": {
+        "type": "text",
+        "value": "From scoping to launch, we handle the whole thing.",
+        "style": {
+          "size": "lg",
+          "weight": "regular",
+          "align": "center",
+          "color": "muted"
+        }
+      },
+      "cta": {
+        "type": "text",
+        "value": "Tell us about your project",
+        "style": {
+          "size": "base",
+          "weight": "semibold",
+          "align": "center",
+          "color": "accent"
+        }
+      }
+    },
+    "pitch": {
+      "body": {
+        "type": "text",
+        "value": "Light pages, readable by search engines and assistants alike, and editable without us.",
+        "style": {
+          "size": "base",
+          "weight": "regular",
+          "align": "left",
+          "color": "secondary"
+        }
+      },
+      "detail": {
+        "type": "richtext",
+        "value": "A <strong>complete</strong> engagement, from scoping to launch. <a href=\"/contact\">Get in touch</a> whenever you like."
+      }
+    },
+    "showcase": {
+      "visual": {
+        "type": "media",
+        "kind": "image",
+        "src": "equipe-en-reunion.webp",
+        "alt": "Our team in a scoping session",
+        "width": 1600,
+        "height": 900
+      },
+      "film": {
+        "type": "media",
+        "kind": "video",
+        "provider": "youtube",
+        "videoId": "aqz-KE-bpKQ",
+        "title": "Our method in three minutes"
+      }
+    }
+  },
+  "collections": {
+    "testimonials": [
+      {
+        "id": "t-001",
+        "quote": {
+          "type": "text",
+          "value": "Remarkable work, delivered on time.",
+          "style": {
+            "size": "lg",
+            "weight": "regular",
+            "italic": true,
+            "align": "left",
+            "color": "primary"
+          }
+        },
+        "author": {
+          "type": "text",
+          "value": "Marie D., director",
+          "style": {
+            "size": "sm",
+            "weight": "medium",
+            "align": "left",
+            "color": "muted"
+          }
+        }
+      },
+      {
+        "id": "t-002",
+        "quote": {
+          "type": "text",
+          "value": "We edit our own copy now, without ever calling anyone.",
+          "style": {
+            "size": "lg",
+            "weight": "regular",
+            "italic": true,
+            "align": "left",
+            "color": "primary"
+          }
+        },
+        "author": {
+          "type": "text",
+          "value": "Karim B., owner",
+          "style": {
+            "size": "sm",
+            "weight": "medium",
+            "align": "left",
+            "color": "muted"
+          }
+        }
+      }
+    ]
+  }
+}
