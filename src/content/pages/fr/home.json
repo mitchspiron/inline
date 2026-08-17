@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "title": "Agence — Accueil",
+    "description": "Conception de sites vitrines performants et durables."
+  },
+  "blocks": {
+    "hero": {
+      "title": {
+        "type": "text",
+        "value": "Nous concevons des sites qui convertissent",
+        "style": { "size": "3xl", "weight": "bold", "align": "center", "color": "primary" }
+      },
+      "subtitle": {
+        "type": "text",
+        "value": "Du cadrage à la mise en ligne, un accompagnement complet.",
+        "style": { "size": "lg", "weight": "regular", "align": "center", "color": "muted" }
+      },
+      "cta": {
+        "type": "text",
+        "value": "Parlons de votre projet",
+        "style": { "size": "base", "weight": "semibold", "align": "center", "color": "accent" }
+      }
+    },
+    "pitch": {
+      "body": {
+        "type": "text",
+        "value": "Des pages légères, lisibles par les moteurs de recherche comme par les assistants, et modifiables sans nous.",
+        "style": { "size": "base", "weight": "regular", "align": "left", "color": "secondary" }
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+---
+import '../styles/tokens.css';
+
+interface Props {
+  title: string;
+  description: string;
+  /** Fichier de contenu source, transmis à l'overlay en mode édition uniquement. */
+  contentFile: string;
+  locale: string;
+  pageName: string;
+}
+
+const { title, description, contentFile, locale, pageName } = Astro.props;
+
+/**
+ * Le mode édition est décidé au build par une variable d'environnement.
+ * Dans un build normal, l'overlay n'existe nulle part : ni script, ni attribut.
+ */
+const editorEnabled = import.meta.env.PUBLIC_EDITOR === 'true';
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+  </head>
+  <body
+    data-cms-file={editorEnabled ? contentFile : undefined}
+    data-cms-locale={editorEnabled ? locale : undefined}
+    data-cms-page={editorEnabled ? pageName : undefined}
+  >
+    <slot />
+
+    {
+      /* `is:inline` : Astro ne touche pas à ce script. L'overlay reste donc
+         totalement hors du graphe de build normal — rien à désactiver ensuite. */
+      editorEnabled &&
+        (import.meta.env.DEV ? (
+          <script type="module" src="/src/editor/index.ts" is:inline />
+        ) : (
+          <script type="module" src="/editor/overlay.js" is:inline />
+        ))
+    }
+  </body>
+</html>

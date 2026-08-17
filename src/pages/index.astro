@@ -1,0 +1,35 @@
+---
+import { getEntry } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import Editable from '../components/Editable.astro';
+
+// Lot 0 : une page, une langue. Le routage [lang]/[...slug] viendra avec le multilingue.
+const LOCALE = 'fr';
+const PAGE = 'home';
+
+const page = await getEntry('pages', `${LOCALE}/${PAGE}`);
+if (!page) {
+  throw new Error(`Contenu introuvable : src/content/pages/${LOCALE}/${PAGE}.json`);
+}
+const data = page.data;
+---
+
+<Base
+  title={data.meta.title}
+  description={data.meta.description}
+  contentFile={`src/content/pages/${LOCALE}/${PAGE}.json`}
+  locale={LOCALE}
+  pageName={PAGE}
+>
+  <main class="page">
+    <section class="hero">
+      <Editable data={data} path="blocks.hero.title" as="h1" />
+      <Editable data={data} path="blocks.hero.subtitle" as="p" />
+      <Editable data={data} path="blocks.hero.cta" as="p" />
+    </section>
+
+    <section>
+      <Editable data={data} path="blocks.pitch.body" as="p" />
+    </section>
+  </main>
+</Base>

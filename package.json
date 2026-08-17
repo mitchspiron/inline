@@ -1,0 +1,30 @@
+{
+  "name": "cms-front-lot0",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "node scripts/check-html.mjs && node scripts/check-secrets.mjs",
+    "editor": "cross-env PUBLIC_EDITOR=true astro dev",
+    "build:editor": "cross-env PUBLIC_EDITOR=true astro build && npm run bundle:editor",
+    "bundle:editor": "esbuild src/editor/index.ts --bundle --minify --format=esm --target=es2020 --outfile=dist/editor/overlay.js",
+    "serve:functions": "wrangler pages dev",
+    "test:git": "node scripts/test-git-provider.mjs",
+    "mock:git": "node scripts/mock-git-api.mjs",
+    "test:editor": "node scripts/test-editor.mjs",
+    "test": "npm run test:git && npm run build:editor && npm run test:editor"
+  },
+  "dependencies": {
+    "astro": "^5.2.5",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "esbuild": "^0.28.2",
+    "jsdom": "^29.1.1",
+    "wrangler": "^3.107.2"
+  }
+}

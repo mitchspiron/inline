@@ -1,0 +1,6 @@
+# Configuration de l'hébergeur pour les fonctions de /functions.
+# Aucun secret ici : les variables se déclarent dans .dev.vars en local et dans
+# la configuration du projet en production.
+name = "cms-front-lot0"
+compatibility_date = "2026-08-17"
+pages_build_output_dir = "dist"

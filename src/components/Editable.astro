@@ -1,0 +1,50 @@
+---
+import type { Page, TextField } from '../content/schema';
+
+interface Props {
+  /** Données de la page (page.data). */
+  data: Page;
+  /** Chemin de la clé dans le JSON, ex. « blocks.hero.title ». */
+  path: string;
+  /** Balise de rendu. */
+  as?: keyof HTMLElementTagNameMap;
+  class?: string;
+}
+
+const { data, path, as: Tag = 'p', class: extraClass = '' } = Astro.props;
+
+/**
+ * Résout le chemin dans le JSON. Un `data-cms` qui pointe vers une clé absente
+ * fait échouer le build — contrôle volontaire, ne pas l'assouplir (CLAUDE.md).
+ */
+function resolveField(source: unknown, keyPath: string): TextField {
+  const node = keyPath
+    .split('.')
+    .reduce<any>((acc, key) => (acc == null ? undefined : acc[key]), source);
+
+  if (node == null) {
+    throw new Error(`[Editable] Le chemin « ${keyPath} » n'existe pas dans le contenu.`);
+  }
+  if (node.type !== 'text') {
+    throw new Error(`[Editable] Le chemin « ${keyPath} » n'est pas un champ texte.`);
+  }
+  return node as TextField;
+}
+
+const field = resolveField(data, path);
+const s = field.style;
+
+const classes = [
+  `cms-size-${s.size}`,
+  `cms-weight-${s.weight}`,
+  s.italic ? 'cms-italic' : '',
+  `cms-align-${s.align}`,
+  `cms-color-${s.color}`,
+  extraClass,
+]
+  .filter(Boolean)
+  .join(' ');
+---
+
+{/* Rendu statique pur : aucune directive client:*, la valeur est dans le HTML brut. */}
+<Tag data-cms={path} class={classes}>{field.value}</Tag>
