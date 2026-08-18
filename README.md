@@ -94,6 +94,7 @@ npm run check            # HTML brut + parité des langues + journaux + aucun se
 npm run test             # Git, authentification, durcissement, amorçage, assainissement, médias, HEIC, langues, overlay
 npm run create:site      # Régénère les accès d'un site : clé, empreinte, variables
 npm run test:scaffold    # Crée un site de zéro, l'installe, le construit, le contrôle
+npm run test:pack        # Idem, mais depuis les archives qu'une publication produirait
 npm run bootstrap        # Extrait le contenu d'une page HTML déjà annotée
 npm run make:key         # Génère seulement une clé et son empreinte (rotation)
 npm run mock:git         # Faux service Git local, pour essayer sans dépôt

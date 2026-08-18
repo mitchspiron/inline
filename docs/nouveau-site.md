@@ -130,6 +130,66 @@ incorrecte », la limitation de débit n'est pas active — ne pas livrer.
 
 ---
 
+## Essayer les paquets avant de les publier
+
+`inline-core` et `create-inline` ne sont pas encore sur un registre. Deux
+façons de les mettre à l'épreuve, qui ne répondent pas à la même question.
+
+**Est-ce que le code marche ?**
+
+```bash
+npm run test:scaffold
+```
+
+Crée un site, installe le paquet **par son chemin dans le dépôt**, construit,
+lance les contrôles.
+
+**Est-ce que ce qui partirait au registre marche ?**
+
+```bash
+npm run test:pack
+```
+
+Même chose, mais en passant par `npm pack` : les archives exactes qu'une
+publication produirait. C'est le seul mode qui attrape un fichier oublié dans
+`files` ou un chemin absent d'`exports` — des erreurs invisibles tant qu'on
+installe depuis un dossier, et qui cassent le premier site d'un tiers.
+
+À lancer avant toute publication.
+
+### À la main
+
+Pour voir le résultat plutôt qu'un rapport :
+
+```bash
+# 1. fabriquer les archives
+npm pack ./packages/inline-core   --pack-destination /tmp/inline
+npm pack ./packages/create-inline --pack-destination /tmp/inline
+
+# 2. créer un site depuis l'archive de création
+cd /tmp/inline && mkdir atelier && cd atelier
+npm exec --yes -- "file:/tmp/inline/create-inline-1.0.0.tgz" mon-site --nom "Essai"
+
+# 3. installer le cœur depuis son archive, puis construire
+cd mon-site
+npm install "file:/tmp/inline/inline-core-2.0.0.tgz"
+npm run build && npm run serve:functions
+```
+
+Deux pièges rencontrés :
+
+- **`npx <archive>` résout le chemin relatif depuis un dossier inattendu.**
+  Passer par `npm exec --yes -- "file:<chemin absolu>"`.
+- **Le projet d'essai doit être sur le même disque que le dépôt.** Astro
+  calcule le chemin d'une route injectée avec `path.relative` : d'un disque à
+  l'autre, il n'existe pas de chemin relatif, et le build échoue pour une
+  raison sans rapport avec le code.
+
+`npm link` fonctionne aussi, mais dédouble Astro entre les deux projets et
+produit des erreurs déroutantes. Les archives sont plus fidèles et plus sûres.
+
+---
+
 ## Mettre à jour un site
 
 ```bash

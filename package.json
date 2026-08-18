@@ -17,6 +17,7 @@
     "test:guard": "node scripts/test-guard.mjs",
     "test:bootstrap": "node scripts/test-bootstrap.mjs",
     "test:scaffold": "node scripts/test-scaffold.mjs",
+    "test:pack": "node scripts/test-scaffold.mjs --paquet",
     "test:editor": "node scripts/test-editor.mjs",
     "serve:functions": "wrangler pages dev",
     "mock:git": "node scripts/mock-git-api.mjs",

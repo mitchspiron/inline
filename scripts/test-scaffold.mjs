@@ -13,17 +13,30 @@
  * local, construit, et lance ses contrôles. Long (une minute environ), mais
  * c'est le seul niveau où la question a un sens.
  *
- * Passer --court pour s'arrêter après la génération, sans installer ni
- * construire — utile en développement, insuffisant en intégration continue.
+ * Trois modes :
+ *
+ *   --court    s'arrête après la génération, sans installer ni construire.
+ *              Utile en développement, insuffisant en intégration continue.
+ *
+ *   (défaut)   installe les paquets par leur chemin dans le dépôt. Rapide à
+ *              mettre en place, mais ne dit rien de ce qui partirait au
+ *              registre : npm suit les fichiers présents, pas la liste
+ *              publiée.
+ *
+ *   --paquet   passe par « npm pack », donc par les archives exactes qu'une
+ *              publication produirait. C'est le seul mode qui attrape un
+ *              fichier oublié dans « files » ou un chemin absent d'« exports ».
+ *              À lancer avant toute publication.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const quick = process.argv.includes('--court');
+const packed = process.argv.includes('--paquet');
 let failures = 0;
 
 function check(label, ok, detail = '') {
@@ -66,13 +79,83 @@ function run(command, args, cwd) {
  */
 const workspace = await mkdtemp(join(root, '.tmp-scaffold-'));
 
+/**
+ * Fabrique l'archive d'un paquet et l'ouvre, pour travailler sur exactement ce
+ * qu'une publication enverrait — ni plus, ni moins.
+ */
+function packAndExtract(packageDir, label) {
+  const dest = join(workspace, `paquet-${label}`);
+  mkdirSync(dest, { recursive: true });
+
+  const done = run('npm', ['pack', packageDir, '--pack-destination', dest, '--silent'], root);
+  if (done.code !== 0) return { code: done.code, output: done.output };
+
+  const tarball = readdirSync(dest).find((entry) => entry.endsWith('.tgz'));
+  if (!tarball) return { code: 1, output: 'aucune archive produite' };
+
+  // Nom nu et répertoire de travail plutôt qu'un chemin complet : certains
+  // « tar » lisent « D:\… » comme une machine distante et tentent de s'y
+  // connecter.
+  const extracted = run('tar', ['-xzf', tarball], dest);
+  return {
+    code: extracted.code,
+    output: extracted.output,
+    archive: join(dest, tarball),
+    dir: join(dest, 'package'),
+  };
+}
+
+let scaffolder = join(root, 'packages/create-inline/index.mjs');
+/** Ce qu'on installera comme `inline-core` : un dossier, ou une archive. */
+let coreSpecifier = `file:${join(root, 'packages/inline-core').replace(/\\/g, '/')}`;
+
+if (packed) {
+  console.log('\nArchives de publication');
+
+  const core = packAndExtract(join(root, 'packages/inline-core'), 'core');
+  check('l\'archive d\'inline-core se fabrique', core.code === 0, core.output?.slice(-300));
+
+  const creator = packAndExtract(join(root, 'packages/create-inline'), 'create');
+  check('l\'archive de create-inline se fabrique', creator.code === 0, creator.output?.slice(-300));
+
+  if (core.code !== 0 || creator.code !== 0) {
+    await rm(workspace, { recursive: true, force: true });
+    process.exit(1);
+  }
+
+  // Ce que « files » a réellement retenu. Un oubli ici ne se voit qu'après
+  // publication, quand un site tiers échoue à construire.
+  for (const [label, file] of [
+    ['l\'intégration', 'astro/index.ts'],
+    ['les composants', 'components/Media.astro'],
+    ['les pages clé en main', 'pages/aide.astro'],
+    ['le schéma', 'src/schema.ts'],
+    ['les routes serveur', 'src/server/routes/save.ts'],
+    ['la correspondance des styles', 'styles/tokens.css'],
+  ]) {
+    check(`l'archive contient ${label}`, existsSync(join(core.dir, file)));
+  }
+  for (const [label, file] of [
+    ['le modèle de contenu', 'modele/src/content/pages/fr/home.json'],
+    ['les adaptateurs de routes', 'modele/functions/api/save.ts'],
+    ['les contrôles', 'modele/scripts/check-html.mjs'],
+    ['l\'intégration continue', 'modele/.github/workflows/ci.yml'],
+    ['le modèle de variables', 'modele/.env.example'],
+  ]) {
+    check(`l'archive de création contient ${label}`, existsSync(join(creator.dir, file)));
+  }
+
+  scaffolder = join(creator.dir, 'index.mjs');
+  coreSpecifier = core.archive;
+}
+
 // --- Génération -----------------------------------------------------------------
 console.log('\nGénération');
 
 const created = run(
   'node',
   [
-    join(root, 'packages/create-inline/index.mjs'),
+    scaffolder,
     'site-essai',
     '--nom',
     'Boulangerie Martin',
@@ -135,7 +218,7 @@ check(
 );
 
 // Un dossier déjà occupé ne doit jamais être écrasé.
-const again = run('node', [join(root, 'packages/create-inline/index.mjs'), 'site-essai'], workspace);
+const again = run('node', [scaffolder, 'site-essai'], workspace);
 check('un dossier non vide n\'est jamais écrasé', again.code === 1);
 
 if (quick) {
@@ -149,8 +232,7 @@ console.log('\nInstallation et build');
 
 // Le paquet local remplace celui du registre : c'est la version en cours de
 // développement qu'on veut mettre à l'épreuve, pas la dernière publiée.
-const corePath = join(root, 'packages/inline-core').replace(/\\/g, '/');
-const installed = run('npm', ['install', '--no-audit', '--no-fund', `inline-core@file:${corePath}`], project);
+const installed = run('npm', ['install', '--no-audit', '--no-fund', coreSpecifier], project);
 check('les dépendances s\'installent', installed.code === 0, installed.output.slice(-600));
 
 const built = run('npm', ['run', 'build'], project);
