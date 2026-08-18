@@ -27,7 +27,11 @@
     "test:sanitize": "node scripts/test-sanitize.mjs",
     "test:media": "node scripts/test-media.mjs",
     "test:heic": "node scripts/test-heic.mjs",
-    "test:locales": "node scripts/test-locales.mjs"
+    "test:locales": "node scripts/test-locales.mjs",
+    "pack:core": "npm pack -w inline-core --pack-destination ./dist-pack",
+    "pack:cli": "npm pack -w create-inline --pack-destination ./dist-pack",
+    "release:core": "npm publish -w inline-core",
+    "release:cli": "npm publish -w create-inline"
   },
   "dependencies": {
     "astro": "^5.2.5",

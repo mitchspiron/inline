@@ -1,16 +1,42 @@
 {
   "name": "create-inline",
   "version": "1.0.0",
-  "description": "Cree un site inline pret a editer.",
+  "description": "Crée un site inline prêt à éditer : npm create inline@latest mon-site",
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "BUSL-1.1",
+  "author": "Mitch Spiron",
+  "homepage": "https://github.com/mitchspiron/inline/tree/main/packages/create-inline#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mitchspiron/inline.git",
+    "directory": "packages/create-inline"
+  },
+  "bugs": {
+    "url": "https://github.com/mitchspiron/inline/issues"
+  },
+  "keywords": [
+    "create-inline",
+    "astro",
+    "cms",
+    "scaffolding",
+    "starter",
+    "template",
+    "inline-editing"
+  ],
+  "engines": {
+    "node": ">=18.20.8"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "create-inline": "index.mjs"
   },
   "files": [
     "index.mjs",
     "modele",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "dependencies": {
     "@noble/hashes": "^2.3.0"

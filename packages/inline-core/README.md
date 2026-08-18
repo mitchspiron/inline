@@ -213,3 +213,14 @@ Voir [CHANGELOG.md](CHANGELOG.md). Le paquet suit le versionnage sémantique :
 Une modification du schéma qui invalide du contenu existant est **toujours**
 une version majeure, même si le code compile : c'est le contenu des clients qui
 casse, pas le nôtre.
+
+---
+
+## Licence
+
+Business Source License 1.1 — voir [LICENSE](LICENSE).
+
+Usage en production autorisé pour les sites que vous construisez, y compris
+pour vos clients. Revendre `inline` comme service de gestion de contenu
+hébergé ou managé ne l'est pas. Le 2030-08-18, la licence bascule
+automatiquement en Apache 2.0.

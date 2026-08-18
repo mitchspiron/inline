@@ -15,6 +15,10 @@ dist/
 # Ateliers de test
 .tmp-scaffold-*/
 
+# Publication
+dist-pack/
+*.tgz
+
 # Outils
 .wrangler/
 *.log
