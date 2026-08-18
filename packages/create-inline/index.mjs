@@ -127,6 +127,7 @@ writeFileSync(
         dev: 'astro dev',
         build: 'astro build',
         'serve:functions': 'wrangler pages dev',
+        'mock:git': 'node scripts/mock-git-api.mjs',
         check: 'node scripts/check-html.mjs && node scripts/check-locales.mjs && node scripts/check-logs.mjs && node scripts/check-secrets.mjs',
       },
       dependencies: {
@@ -213,16 +214,22 @@ console.log(`
 
   1.  cd ${target}
       npm install
-      npm run build && npm run serve:functions
 
-  2.  Ouvrez http://127.0.0.1:8788/admin et saisissez cette clé :
+  2.  Dans trois terminaux, à la racine du projet :
+
+        npm run mock:git         faux dépôt local, pour publier sans rien brancher
+        npm run build
+        npm run serve:functions
+
+  3.  Ouvrez http://127.0.0.1:8788/admin et saisissez cette clé :
 
           ${key}
 
       Elle est déjà dans .dev.vars, qui n'entrera jamais dans le dépôt. Pour
       la production, régénérez-en une et posez les variables chez l'hébergeur.
 
-  3.  Modifiez un texte sur la page, cliquez sur Publier.
+  4.  Modifiez un texte sur la page, cliquez sur Publier. La publication
+      écrit dans src/content/ — relancez le build pour la voir figée.
 
   Ensuite : votre charte dans src/styles/theme.css, votre contenu dans
   src/content/, vos images dans src/media/. La logique d'édition vit dans

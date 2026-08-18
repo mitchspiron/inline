@@ -180,10 +180,11 @@ Deux pièges rencontrés :
 
 - **`npx <archive>` résout le chemin relatif depuis un dossier inattendu.**
   Passer par `npm exec --yes -- "file:<chemin absolu>"`.
-- **Le projet d'essai doit être sur le même disque que le dépôt.** Astro
-  calcule le chemin d'une route injectée avec `path.relative` : d'un disque à
-  l'autre, il n'existe pas de chemin relatif, et le build échoue pour une
-  raison sans rapport avec le code.
+- **Installer `inline-core` par son *dossier* impose que le projet d'essai soit
+  sur le même disque que le dépôt** : npm pose alors un lien symbolique, et
+  Astro calcule le chemin d'une route injectée avec `path.relative`, qui
+  n'existe pas d'un disque à l'autre. Installer l'*archive* copie le paquet et
+  lève la contrainte — une raison de plus de préférer ce mode.
 
 `npm link` fonctionne aussi, mais dédouble Astro entre les deux projets et
 produit des erreurs déroutantes. Les archives sont plus fidèles et plus sûres.

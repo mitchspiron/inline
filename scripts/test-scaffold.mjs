@@ -210,6 +210,27 @@ check(
 );
 
 const devVars = readFileSync(join(project, '.dev.vars'), 'utf8');
+
+/**
+ * Ce que `.dev.vars` promet doit exister dans le projet.
+ *
+ * Il pointe vers un faux dépôt local pour qu'on puisse publier dès la première
+ * minute, sans dépôt ni hébergeur. Si le service n'est pas livré avec, la
+ * première publication échoue sur une erreur réseau et la promesse ment — ce
+ * qui est exactement arrivé avant que ce contrôle existe.
+ */
+if (/GIT_API_BASE=http:\/\/127\.0\.0\.1/.test(devVars)) {
+  check('le faux dépôt local est livré', existsSync(join(project, 'scripts/mock-git-api.mjs')));
+  check(
+    'et il a sa commande',
+    JSON.parse(readFileSync(join(project, 'package.json'), 'utf8')).scripts['mock:git'] !==
+      undefined,
+  );
+  check(
+    'le mode d\'emploi affiché explique comment le lancer',
+    /mock:git/.test(created.output),
+  );
+}
 check('l\'empreinte de la clé est posée, pas la clé', /EDITOR_KEY_HASH=\$argon2id\$/.test(devVars));
 check('la clé en clair n\'est nulle part sur disque', !devVars.includes('EDITOR_KEY='));
 check(

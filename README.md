@@ -97,7 +97,7 @@ npm run test:scaffold    # Crée un site de zéro, l'installe, le construit, le 
 npm run test:pack        # Idem, mais depuis les archives qu'une publication produirait
 npm run bootstrap        # Extrait le contenu d'une page HTML déjà annotée
 npm run make:key         # Génère seulement une clé et son empreinte (rotation)
-npm run mock:git         # Faux service Git local, pour essayer sans dépôt
+npm run mock:git         # Faux service Git local, pour publier sans dépôt
 ```
 
 `npm run check` doit passer avant tout commit. Il échoue si une valeur du JSON
