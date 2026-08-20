@@ -1,5 +1,8 @@
 # inline-core
 
+**Documentation complète : [inline-docs.netlify.app](https://inline-docs.netlify.app)**
+— vingt chapitres, du premier site à la mise en production.
+
 La partie d'`inline` qui est identique d'un site à l'autre : l'overlay
 d'édition, le modèle de contenu, les routes serveur et les deux points de
 couplage.

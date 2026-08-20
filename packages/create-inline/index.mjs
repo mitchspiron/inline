@@ -26,6 +26,13 @@ const MODELE = join(here, 'modele');
 /** Version d'`inline-core` posée en dépendance du site créé. */
 const CORE_VERSION = '^2.0.0';
 const ASTRO_VERSION = '^5.2.5';
+/**
+ * `scripts/make-key.mjs` en a besoin. Déclaré explicitement, et pas laissé au
+ * hasard : le paquet arrive bien dans l'arbre par `inline-core`, mais rien ne
+ * garantit qu'il soit hissé à la racine — sous pnpm, ou sous npm en stratégie
+ * imbriquée, la commande échouerait sur un module introuvable.
+ */
+const HASHES_VERSION = '^2.3.0';
 
 function option(name, fallback = '') {
   const index = process.argv.indexOf(`--${name}`);
@@ -138,6 +145,7 @@ writeFileSync(
         'inline-core': CORE_VERSION,
       },
       devDependencies: {
+        '@noble/hashes': HASHES_VERSION,
         wrangler: '^3.107.2',
       },
     },

@@ -5,7 +5,7 @@
   "type": "module",
   "license": "BUSL-1.1",
   "author": "Mitch Spiron",
-  "homepage": "https://github.com/mitchspiron/inline/tree/main/packages/create-inline#readme",
+  "homepage": "https://inline-docs.netlify.app",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mitchspiron/inline.git",

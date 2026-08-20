@@ -9,6 +9,19 @@ Versionnage sémantique, avec une règle qui lui est propre :
 
 ---
 
+## 2.0.1
+
+Rien dans le code : les fichiers publiés sont identiques à ceux de la 2.0.0.
+
+### Changé
+
+- **La documentation a une adresse** : <https://inline-docs.netlify.app>. Elle
+  devient la page d'accueil du paquet sur npm, et s'affiche en tête du README.
+  Une version était nécessaire pour cela seul — npm ne relit les métadonnées
+  qu'à la publication.
+
+---
+
 ## 2.0.0
 
 `inline-core` devient utilisable depuis n'importe quel projet Astro : une

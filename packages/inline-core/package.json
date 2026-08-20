@@ -1,11 +1,11 @@
 {
   "name": "inline-core",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Édition de contenu en front pour sites statiques Astro — la partie partagée entre tous les sites.",
   "type": "module",
   "license": "BUSL-1.1",
   "author": "Mitch Spiron",
-  "homepage": "https://github.com/mitchspiron/inline/tree/main/packages/inline-core#readme",
+  "homepage": "https://inline-docs.netlify.app",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mitchspiron/inline.git",

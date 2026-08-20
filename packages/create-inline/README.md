@@ -1,6 +1,9 @@
 # create-inline
 
-Crée un site [`inline`](https://github.com/mitchspiron/inline) prêt à éditer.
+**Documentation complète : [inline-docs.netlify.app](https://inline-docs.netlify.app)**
+— vingt chapitres, du premier site à la mise en production.
+
+Crée un site `inline` prêt à éditer.
 
 ```bash
 npm create inline@latest mon-site
