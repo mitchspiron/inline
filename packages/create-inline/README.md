@@ -78,6 +78,12 @@ n'y a pas de période de recouvrement.
 
 Node.js 18.20.8 ou plus récent.
 
+## Versions
+
+Voir [CHANGELOG.md](CHANGELOG.md). Ce paquet n'est exécuté qu'une fois par site,
+à sa création : une correction n'atteint jamais les sites déjà créés. Chaque
+entrée du journal dit donc ce qu'un site existant doit faire pour rattraper.
+
 ## Licence
 
 Business Source License 1.1 — voir [LICENSE](LICENSE). Usage en production

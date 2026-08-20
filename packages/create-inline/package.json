@@ -36,6 +36,7 @@
     "index.mjs",
     "modele",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "dependencies": {
