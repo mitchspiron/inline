@@ -28,9 +28,12 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
  * lui qui reçoit les variables et les passe à `inline-core`.
  *
  * `scripts/` est volontairement absent : make-key.mjs affiche la clé, une fois,
- * dans un terminal — c'est sa raison d'être, pas une fuite.
+ * dans un terminal — c'est sa raison d'être, pas une fuite. Et c'est bien
+ * `netlify/source` qui est inspecté, pas `netlify/functions` : le second est
+ * un produit du build, où un journal de dépendance tierce ferait un faux
+ * positif sans qu'aucune ligne du dépôt soit en cause.
  */
-const SCANNED = ['functions', 'netlify', 'packages/inline-core/src', 'src'];
+const SCANNED = ['functions', 'netlify/source', 'packages/inline-core/src', 'src'];
 
 /**
  * Identifiants qui ne doivent jamais être évalués dans un appel de journal.

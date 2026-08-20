@@ -139,7 +139,8 @@ if (packed) {
   for (const [label, file] of [
     ['le modèle de contenu', 'modele/src/content/pages/fr/home.json'],
     ['les adaptateurs de routes', 'modele/functions/api/save.ts'],
-    ["l'adaptateur Netlify", 'modele/netlify/functions/api.mts'],
+    ["l'adaptateur Netlify", 'modele/netlify/source/api.mts'],
+    ['son assemblage', 'modele/scripts/build-netlify.mjs'],
     ['la configuration Netlify', 'modele/netlify.toml'],
     ['le serveur Node autonome', 'modele/scripts/serve.mjs'],
     ['les contrôles', 'modele/scripts/check-html.mjs'],
@@ -188,7 +189,8 @@ for (const file of [
   'tsconfig.json',
   'functions/api/save.ts',
   'netlify.toml',
-  'netlify/functions/api.mts',
+  'netlify/source/api.mts',
+  'scripts/build-netlify.mjs',
   'scripts/serve.mjs',
   'src/lib/api.ts',
   'src/content/config.ts',
@@ -300,55 +302,56 @@ if (built.code === 0) {
   check('la page d\'aide est produite', existsSync(join(project, 'dist/aide/index.html')));
   check('l\'overlay est construit', existsSync(join(project, 'dist/editor/overlay.js')));
 
-  // --- Les trois adaptateurs répondent, et répondent pareil ---------------------
+  // --- Les adaptateurs du site généré ------------------------------------------
   //
   // C'est le seul échec d'`inline` qui ne se voit pas à l'écran : un site
-  // déposé sans ses routes s'affiche parfaitement et refuse la clé. Le contrôle
-  // appelle donc les adaptateurs du site *généré*, pas ceux du dépôt.
-  //
-  // Ils sont assemblés puis appelés en mémoire plutôt que servis sur un port :
-  // on vérifie le câblage, et un port occupé ne doit pas faire échouer un test.
+  // déposé sans routes utilisables s'affiche parfaitement et refuse la clé.
+  // Le contrôle porte donc sur le site *généré*, et sur l'artefact réellement
+  // déployé — pas sur la source dont il sort.
+  const netlifyBuilt = run('npm', ['run', 'build:netlify'], project);
+  check(
+    "la fonction Netlify s'assemble",
+    netlifyBuilt.code === 0,
+    netlifyBuilt.output.slice(-600),
+  );
+
   writeFileSync(
     join(project, 'essai-adaptateurs.mjs'),
     `import { build } from 'esbuild';
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 
-const assemble = async (entry, out) => {
-  await build({
-    entryPoints: [entry], outfile: out, bundle: true, platform: 'node',
-    format: 'esm', target: 'node20', packages: 'bundle', external: ['node:*'],
-    logLevel: 'silent',
-  });
-  return import(pathToFileURL(out).href);
-};
-
-const query = (method, path) =>
-  new Request('https://exemple.fr' + path, { method });
+const query = (method, path) => new Request('https://exemple.fr' + path, { method });
 
 // La table, telle que la lisent les adaptateurs de /functions.
-const { api } = await assemble('src/lib/api.ts', join('node_modules', '.essai', 'api.mjs'));
+await build({
+  entryPoints: ['src/lib/api.ts'], outfile: join('node_modules', '.essai', 'api.mjs'),
+  bundle: true, platform: 'node', format: 'esm', target: 'node20',
+  packages: 'bundle', external: ['node:*'], logLevel: 'silent',
+});
+const { api } = await import(pathToFileURL(join('node_modules', '.essai', 'api.mjs')).href);
 const viaTable = await api.routes['/api/auth'].onRequest({
   request: query('GET', '/api/auth'), env: {},
 });
 
-// Le point d'entrée unique, tel que l'appelle l'adaptateur Netlify.
-const netlify = await assemble(
-  'netlify/functions/api.mts', join('node_modules', '.essai', 'netlify.mjs'),
-);
-const viaNetlify = await netlify.default(query('GET', '/api/auth'));
+// L'artefact Netlify, chargé comme son exécution le charge.
+const netlify = await import(pathToFileURL('netlify/functions/api.mjs').href);
 
 console.log(JSON.stringify({
   table: viaTable.status,
-  netlify: viaNetlify.status,
+  netlify: (await netlify.default(query('GET', '/api/auth'))).status,
   chemin: netlify.config?.path,
   inconnu: (await netlify.default(query('GET', '/api/inconnu'))).status,
+  // Ce qui distingue une fonction v2 d'une v1. Un artefact en CommonJS
+  // n'exposerait pas « default », et l'exécution appellerait « handler » :
+  // 502 « handler is not a function », au moment d'entrer la clé.
+  defaut: typeof netlify.default,
 }));
 `,
   );
 
   const adapters = run('node', ['essai-adaptateurs.mjs'], project);
-  check("les adaptateurs du site généré s'assemblent", adapters.code === 0, adapters.output.slice(-600));
+  check("les adaptateurs du site généré s'exécutent", adapters.code === 0, adapters.output.slice(-600));
 
   if (adapters.code === 0) {
     const line = adapters.output.trim().split(/\r?\n/).pop();
@@ -360,14 +363,19 @@ console.log(JSON.stringify({
     }
 
     check('la table sert /api/auth', seen.table === 405, `reçu ${seen.table}`);
-    check("l'adaptateur Netlify sert /api/auth", seen.netlify === 405, `reçu ${seen.netlify}`);
+    check("l'artefact Netlify sert /api/auth", seen.netlify === 405, `reçu ${seen.netlify}`);
     check(
       'les deux formes répondent la même chose',
       seen.table === seen.netlify,
       `table ${seen.table}, Netlify ${seen.netlify}`,
     );
-    check("l'adaptateur Netlify déclare son chemin", seen.chemin === '/api/*', String(seen.chemin));
+    check("l'artefact Netlify déclare son chemin", seen.chemin === '/api/*', String(seen.chemin));
     check('un chemin inconnu répond 404', seen.inconnu === 404, `reçu ${seen.inconnu}`);
+    check(
+      "l'artefact Netlify est une fonction v2, pas v1",
+      seen.defaut === 'function',
+      `export par défaut : ${seen.defaut}`,
+    );
   }
 
   const home = readFileSync(join(project, 'dist/fr/index.html'), 'utf8');

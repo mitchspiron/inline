@@ -204,7 +204,7 @@ adaptateur qui ne décide rien :
 ```
 src/lib/api.ts             createRouter({ locales }) — la déclaration
 functions/api/*.ts         hébergeur qui découvre les routes par l'arborescence
-netlify/functions/api.mts  Netlify — un point d'entrée, un chemin déclaré
+netlify/source/api.mts     Netlify — assemblé au build en ESM autonome
 scripts/serve.mjs          Node seul — conteneur, VPS, autre plateforme
 ```
 
@@ -238,6 +238,23 @@ curl -i https://monsite.fr/api/auth
 
 `405 method_not_allowed` : les fonctions tournent, la clé fonctionnera. Du HTML
 ou un `404` : elles ne tournent pas, et aucune clé ne marchera.
+
+### Le piège Netlify
+
+Sur Netlify, la commande de build est `npm run build && npm run build:netlify` :
+la fonction est assemblée **par le dépôt**, en ESM autonome, et non par Netlify.
+
+> **Ne pas déclarer `node_bundler = "esbuild"` dans `netlify.toml`.** Netlify
+> produit alors du CommonJS : l'export par défaut devient `exports.default`, la
+> fonction est prise pour une v1, et l'exécution appelle `handler` qui n'existe
+> pas. Symptôme : **502 « handler is not a function »** au moment d'entrer la
+> clé — un échec qui, lui aussi, fait soupçonner la clé. Sans cette option et
+> sans assemblage préalable, Netlify devrait résoudre lui-même le TypeScript
+> d'`inline-core`, publié en source, ce qu'il ne sait pas faire.
+
+`scripts/build-netlify.mjs` vérifie son propre produit — export par défaut,
+chemin `/api/*`, `GET /api/auth` qui répond 405 — et fait échouer le build
+plutôt que le site déployé.
 
 ### Essayer en local, sans outil d'hébergeur
 
@@ -347,8 +364,9 @@ src/pages/[lang]/            Les pages
 src/media/                   Les images téléversées
 src/lib/api.ts               Les routes de CE site — une ligne, comme locales.ts
 functions/api/*.ts           Adaptateur : hébergeur à découverte par arborescence
-netlify/functions/api.mts    Adaptateur : Netlify
+netlify/source/api.mts       Adaptateur : Netlify (assemblé par le build)
 netlify.toml                 Sa configuration — pendant de wrangler.toml
+scripts/build-netlify.mjs    Produit netlify/functions/api.mjs, et le vérifie
 scripts/serve.mjs            Adaptateur : Node seul (conteneur, VPS, autre)
 scripts/                     Contrôles et outils de test
 ```

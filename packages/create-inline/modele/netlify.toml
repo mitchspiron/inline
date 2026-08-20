@@ -1,30 +1,34 @@
-# Configuration de l'hébergeur Netlify, pendant de wrangler.toml.
+# Configuration de l'hébergeur Netlify, pendant de wrangler.toml pour Cloudflare.
 #
 # Aucun secret ici. Les variables se déclarent dans la configuration du site
-# (Site configuration → Environment variables), jamais dans le dépôt — règle 4.
+# (Site configuration → Environment variables), jamais dans le dépôt.
 #
-# Les routes ne sont pas décrites dans ce fichier : la fonction
-# netlify/functions/api.mts déclare elle-même le chemin qu'elle sert, et la
-# liste des routes vit dans `inline-core`.
-#
-# Site déposé ailleurs ? Ce fichier ne gêne pas, et se supprime.
+# Les routes ne sont pas décrites dans ce fichier : la fonction déclare
+# elle-même le chemin qu'elle sert, et la liste des routes vit dans
+# src/lib/api.ts.
 
 [build]
-  command = "npm run build"
+  # Deux temps : le site statique, puis la fonction assemblée en ESM autonome.
+  # Voir scripts/build-netlify.mjs — netlify/functions/ est produit, pas écrit.
+  command = "npm run build && npm run build:netlify"
   publish = "dist"
 
 [build.environment]
-  # Le site est statique ; seules les fonctions tournent sous Node.
+  # Le site est statique ; seule la fonction tourne sous Node.
   NODE_VERSION = "22"
 
 [functions]
   directory = "netlify/functions"
-  # Les fonctions importent du TypeScript depuis src/ et node_modules :
-  # esbuild les assemble en un seul module, sans étape de compilation à part.
-  node_bundler = "esbuild"
+  # « node_bundler » n'est volontairement PAS déclaré.
+  #
+  # Avec « esbuild », Netlify produit du CommonJS : l'export par défaut devient
+  # « exports.default », la fonction est prise pour une v1, et l'exécution
+  # appelle « handler » qui n'existe pas — 502 au moment d'entrer la clé.
+  # La fonction déposée ici est déjà assemblée : Netlify n'a rien à faire.
 
 # « netlify dev » : le serveur de développement d'Astro sert les pages, Netlify
-# ajoute /api/* par-dessus. Les variables sont lues dans .env, pas .dev.vars.
+# ajoute /api/* par-dessus. Lancer « npm run build:netlify » une fois avant.
+# Les variables sont lues dans .env, pas .dev.vars — voir README.
 [dev]
   command = "npm run dev"
   targetPort = 4321

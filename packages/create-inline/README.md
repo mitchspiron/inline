@@ -64,7 +64,7 @@ de règle : les routes sont déclarées une seule fois, dans `src/lib/api.ts`.
 
 ```
 functions/api/*.ts         hébergeur qui découvre les routes par l'arborescence
-netlify/functions/api.mts  Netlify (avec netlify.toml)
+netlify/source/api.mts     Netlify (assemblé au build, avec netlify.toml)
 scripts/serve.mjs          Node seul — conteneur, VPS, autre plateforme
 ```
 

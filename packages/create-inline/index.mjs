@@ -150,6 +150,10 @@ writeFileSync(
         build: 'astro build',
         // Trois façons de servir le site avec ses routes. La troisième ne
         // dépend d'aucun hébergeur — voir README, « Le déploiement ».
+        // La fonction Netlify est assemblée par le dépôt, pas par Netlify :
+        // son bundler produit du CommonJS, et la fonction serait prise pour
+        // une v1. Voir scripts/build-netlify.mjs.
+        'build:netlify': 'node scripts/build-netlify.mjs',
         serve: 'node scripts/serve.mjs',
         'serve:functions': 'wrangler pages dev',
         'mock:git': 'node scripts/mock-git-api.mjs',
@@ -184,6 +188,7 @@ node_modules/
 # Build
 dist/
 .astro/
+netlify/functions/
 
 # Secrets — aucun fichier d'environnement réel ne doit entrer dans le dépôt.
 # Seul .env.example est versionné.

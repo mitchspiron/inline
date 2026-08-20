@@ -16,6 +16,18 @@
  * Tout fichier posé à la racine de netlify/functions devient une fonction : les
  * deux traductions vivent donc ici et non dans un fichier voisin.
  *
+ * Ce fichier n'est PAS la fonction déployée : il en est la source. Le build
+ * l'assemble en un module ESM autonome, netlify/functions/api.mjs, et c'est
+ * celui-là que Netlify déploie — voir scripts/build-netlify.mjs.
+ *
+ * Pourquoi cet assemblage n'est pas laissé à Netlify. Son option
+ * « node_bundler = esbuild » produit du CommonJS : l'export par défaut devient
+ * « exports.default », la fonction est prise pour une v1, et l'exécution
+ * appelle « handler » qui n'existe pas — 502, « handler is not a function ».
+ * Sans cette option, Netlify n'assemble pas et doit résoudre lui-même le
+ * TypeScript d'`inline-core`, publié en source, ce qu'il ne sait pas faire.
+ * Un module déjà assemblé écarte les deux problèmes.
+ *
  * Site déposé ailleurs ? Ce dossier ne gêne pas, et se supprime.
  */
 import { api } from '../../src/lib/api';

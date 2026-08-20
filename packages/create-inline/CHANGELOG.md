@@ -23,18 +23,34 @@ rien ne dise pourquoi.
   `createRouter({ locales: LOCALES })`. C'est de la configuration, comme
   `locales.ts` ; la répartition vit dans `inline-core` (≥ 2.1.0) et se met à
   jour avec lui.
-- **`netlify/functions/api.mts` et `netlify.toml`** — l'adaptateur Netlify. Une
-  seule fonction pour les quatre routes, aucune redirection à écrire. Il traduit
-  les deux seuls écarts : `process.env` au lieu des liaisons, et le stockage
-  d'objets de Netlify au lieu d'un espace clé-valeur pour le comptage des
-  tentatives. Si ce stockage est indisponible, le comptage retombe en mémoire
-  **et le dit dans les journaux**.
+- **`netlify/source/api.mts`, `netlify.toml` et `scripts/build-netlify.mjs`** —
+  l'adaptateur Netlify. Une seule fonction pour les quatre routes, aucune
+  redirection à écrire. Il traduit les deux seuls écarts : `process.env` au lieu
+  des liaisons, et le stockage d'objets de Netlify au lieu d'un espace
+  clé-valeur pour le comptage des tentatives. Si ce stockage est indisponible,
+  le comptage retombe en mémoire **et le dit dans les journaux**.
+
+  La fonction est **assemblée par le site** (`npm run build:netlify`), en ESM
+  autonome, et non par Netlify. Deux raisons, et il faut connaître la première :
+
+  - avec `node_bundler = "esbuild"`, Netlify produit du CommonJS. L'export par
+    défaut devient `exports.default`, la fonction est prise pour une **v1**, et
+    l'exécution appelle `handler` — qui n'existe pas. Le site répond alors
+    **502 « handler is not a function »** au moment où le client entre sa clé,
+    et rien n'indique que la clé n'y est pour rien ;
+  - sans cette option, Netlify doit résoudre lui-même le TypeScript
+    d'`inline-core`, publié en source — ce que Node ne sait pas charger.
+
+  `build-netlify.mjs` vérifie son propre produit avant de rendre la main :
+  export par défaut présent, chemin `/api/*` déclaré, `GET /api/auth` qui répond
+  405. Un artefact inutilisable fait échouer le build, pas le site déployé.
 - **`scripts/serve.mjs` et `npm run serve`** — le site et ses routes servis par
   Node seul, sans outil d'hébergeur : un conteneur, une machine, n'importe
   quelle plateforme qui lance un processus. C'est aussi le moyen le plus court
   d'essayer les routes en local.
 - **`@netlify/blobs` en dépendance, `esbuild` en dépendance de développement**
   du site créé — pour les deux points ci-dessus.
+- **`netlify/functions/` est ignoré par Git** : c'est un produit du build.
 
 ### Changé
 
@@ -56,8 +72,10 @@ d'origine. Pour gagner la portabilité, quatre gestes, dans cet ordre :
 1. `npm update inline-core` (≥ 2.1.0) ;
 2. créer `src/lib/api.ts` avec la ligne `createRouter` ;
 3. y brancher les quatre fichiers de `functions/api/` ;
-4. copier `netlify/`, `netlify.toml` et `scripts/serve.mjs` depuis un site créé
-   avec cette version.
+4. copier `netlify/`, `netlify.toml`, `scripts/serve.mjs` et
+   `scripts/build-netlify.mjs` depuis un site créé avec cette version, et
+   régler la commande de build de Netlify sur
+   `npm run build && npm run build:netlify`.
 
 Le plus simple reste de générer un site neuf à côté et d'y prendre les fichiers.
 

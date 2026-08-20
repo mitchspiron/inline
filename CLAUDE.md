@@ -67,7 +67,8 @@ styles/tokens.css         Enums du schéma → variables du thème
   /pages/[lang]/[...slug].astro
   /lib/api.ts             Les routes de CE site : createRouter({ locales })
 /functions/api/*.ts       Adaptateur : hébergeur à découverte par arborescence
-/netlify/functions/api.mts    Adaptateur : Netlify (+ netlify.toml)
+/netlify/source/api.mts   Adaptateur : Netlify — assemblé par le build
+/scripts/build-netlify.mjs    ...qui produit netlify/functions/api.mjs
 /scripts/serve.mjs        Adaptateur : Node seul — conteneur, VPS, autre
 /scripts
   check-html.mjs          CI : vérifie que le contenu est dans le HTML brut

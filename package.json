@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "build:netlify": "node scripts/build-netlify.mjs",
     "preview": "astro preview",
     "serve": "node scripts/serve.mjs",
     "check": "node scripts/check-html.mjs && node scripts/check-locales.mjs && node scripts/check-logs.mjs && node scripts/check-secrets.mjs",

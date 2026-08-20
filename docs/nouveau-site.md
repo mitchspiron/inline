@@ -114,8 +114,11 @@ plateforme visée ; les autres dossiers se suppriment sans rien casser.
 | Netlify | `netlify/` + `netlify.toml` | stockage d'objets du site |
 | conteneur, VPS, autre | `npm run serve` | mémoire — **une seule instance** |
 
-1. Créer le projet chez l'hébergeur, branché sur le dépôt. Commande de build :
-   `npm run build`, dossier publié : `dist`.
+1. Créer le projet chez l'hébergeur, branché sur le dépôt. Dossier publié :
+   `dist`. Commande de build : `npm run build` — **sur Netlify,
+   `npm run build && npm run build:netlify`**, qui assemble la fonction. Ne pas
+   déclarer `node_bundler` dans `netlify.toml` : la fonction serait prise pour
+   une v1 et l'exécution répondrait 502 « handler is not a function ».
 2. Poser les variables affichées par `create:site` en **secrets d'exécution**,
    jamais en variables de build : elles ne doivent pas atteindre le navigateur.
 3. Activer le stockage partagé du comptage, selon la colonne ci-dessus.
