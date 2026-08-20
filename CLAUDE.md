@@ -18,7 +18,7 @@ Ces règles priment sur toute autre considération. En cas de doute, demander pl
 2. **Aucune zone éditable à l'intérieur d'un composant hydraté.** Deux raisons distinctes, à ne pas confondre : `client:only` sort le contenu du HTML brut, donc de l'index des crawlers IA ; `client:load` l'y laisse mais **réaffiche la zone au chargement, effaçant les modifications en cours du client** — c'est la plus contraignante, et elle ne se voit pas dans la source. Hors zone éditable, un composant React, Vue ou Svelte est légitime : rendu au build sans directive `client:*`, il produit du HTML statique ; hydraté, il ne gêne rien tant qu'aucun `data-cms` n'est dedans (un carousel doit contenir tous ses slides en dur, le JS ne fait que les faire défiler). `check-html.mjs` applique exactement cette règle.
 3. **Le token Git ne quitte jamais le serveur.** Il appartient à l'agence, pas au client. Aucun code ne doit le placer dans une réponse, un fichier servi, `localStorage` ou `sessionStorage`.
 3 bis. **La clé de site est vérifiée exclusivement côté serveur.** Ne jamais servir `EDITOR_KEY_HASH` au navigateur, ne jamais comparer la clé en JavaScript client. Un hash exposé est attaquable hors ligne.
-4. **Aucun secret dans le dépôt.** Tokens et clés vivent exclusivement en variables d'environnement de la fonction serveur — l'hébergeur n'est pas tranché, aucun code ne doit en dépendre.
+4. **Aucun secret dans le dépôt.** Tokens et clés vivent exclusivement en variables d'environnement de la fonction serveur — l'hébergeur n'est pas tranché, aucun code ne doit en dépendre. Concrètement : `packages/inline-core` ne nomme aucun hébergeur (un contrôle de `test-router.mjs` le vérifie), et le site en porte un adaptateur par plateforme visée, chacun sans règle. Ajouter un hébergeur ne doit toucher ni au contenu, ni aux routes, ni au paquet.
 5. **Aucun style libre.** Les styles éditables passent uniquement par les enums Zod de `inline-core/style-tokens`. Pas d'hexadécimal, pas de pixels dans le JSON de contenu.
 6. **Ne pas utiliser `src/pages/api/*`.** En sortie statique, ces endpoints s'exécutent au build et non à la requête. Toute route dynamique va dans `/functions`.
 7. **Toute écriture est validée côté serveur** : identité, schéma Zod, chemin en liste blanche, taille, assainissement. Ne jamais se reposer sur la validation client.
@@ -48,6 +48,7 @@ src/server/auth.ts        verifyAuth / createSession
 src/server/guard.ts       Débit, plafonds, chemins autorisés
 src/server/git-provider.ts    Abstraction GitHub / GitLab
 src/server/routes/        Les quatre routes, en fabriques configurables
+src/server/router.ts      createRouter — les réunit, sans connaître d'hébergeur
 styles/tokens.css         Enums du schéma → variables du thème
 ```
 
@@ -64,7 +65,10 @@ styles/tokens.css         Enums du schéma → variables du thème
   /media                  Images téléversées — dans src/, pour qu'`<Image />` les traite au build
   /styles/theme.css       La charte du client
   /pages/[lang]/[...slug].astro
-/functions/api/*.ts       Quatre adaptateurs de trois lignes, jamais de règle
+  /lib/api.ts             Les routes de CE site : createRouter({ locales })
+/functions/api/*.ts       Adaptateur : hébergeur à découverte par arborescence
+/netlify/functions/api.mts    Adaptateur : Netlify (+ netlify.toml)
+/scripts/serve.mjs        Adaptateur : Node seul — conteneur, VPS, autre
 /scripts
   check-html.mjs          CI : vérifie que le contenu est dans le HTML brut
   check-locales.mjs       CI : parité des clés entre locales
@@ -141,6 +145,7 @@ npm run dev             # Serveur Astro local
 npm run build           # Build de production (échoue si Zod invalide)
 npm run check           # HTML brut + parité des langues + journaux + secrets
 npm run test            # Toute la suite
+npm run serve           # Site + fonctions sur Node seul, sans outil d'hébergeur
 npm run serve:functions # Site + fonctions (wrangler pages dev)
 npm run create:site     # Prépare un nouveau site
 npm run bootstrap       # Reprend une page HTML annotée

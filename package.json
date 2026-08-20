@@ -10,11 +10,13 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
+    "serve": "node scripts/serve.mjs",
     "check": "node scripts/check-html.mjs && node scripts/check-locales.mjs && node scripts/check-logs.mjs && node scripts/check-secrets.mjs",
-    "test": "npm run test:git && npm run test:auth && npm run test:guard && npm run test:bootstrap && node scripts/test-scaffold.mjs --court && npm run test:sanitize && npm run test:media && npm run test:heic && npm run build && npm run test:locales && npm run test:editor",
+    "test": "npm run test:git && npm run test:auth && npm run test:guard && npm run test:router && npm run test:bootstrap && node scripts/test-scaffold.mjs --court && npm run test:sanitize && npm run test:media && npm run test:heic && npm run build && npm run test:locales && npm run test:editor",
     "test:git": "node scripts/test-git-provider.mjs",
     "test:auth": "node scripts/test-auth.mjs",
     "test:guard": "node scripts/test-guard.mjs",
+    "test:router": "node scripts/test-router.mjs",
     "test:bootstrap": "node scripts/test-bootstrap.mjs",
     "test:scaffold": "node scripts/test-scaffold.mjs",
     "test:pack": "node scripts/test-scaffold.mjs --paquet",
@@ -34,6 +36,7 @@
     "release:cli": "npm publish -w create-inline"
   },
   "dependencies": {
+    "@netlify/blobs": "^10.7.13",
     "astro": "^5.2.5",
     "inline-core": "^2.0.0"
   },

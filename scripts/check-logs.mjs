@@ -21,8 +21,16 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** Les répertoires qui produisent du code exécuté avec des secrets à portée. */
-const SCANNED = ['functions', 'packages/inline-core/src', 'src'];
+/**
+ * Les répertoires qui produisent du code exécuté avec des secrets à portée.
+ *
+ * Un adaptateur d'hébergeur en fait partie, quel que soit l'hébergeur : c'est
+ * lui qui reçoit les variables et les passe à `inline-core`.
+ *
+ * `scripts/` est volontairement absent : make-key.mjs affiche la clé, une fois,
+ * dans un terminal — c'est sa raison d'être, pas une fuite.
+ */
+const SCANNED = ['functions', 'netlify', 'packages/inline-core/src', 'src'];
 
 /**
  * Identifiants qui ne doivent jamais être évalués dans un appel de journal.

@@ -1,8 +1,7 @@
 /** Adaptateur de route — voir functions/api/auth.ts. */
-import { createSaveRoute } from 'inline-core/server';
-import { LOCALES } from '../../src/lib/locales';
+import { api } from '../../src/lib/api';
 
-const route = createSaveRoute({ locales: LOCALES });
+const route = api.routes['/api/save'];
 
 export const onRequest = route.onRequest;
 export const onRequestPost = route.onRequestPost;

@@ -21,5 +21,6 @@ dist-pack/
 
 # Outils
 .wrangler/
+.netlify/
 *.log
 .DS_Store

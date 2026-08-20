@@ -1,7 +1,7 @@
 /** Adaptateur de route — voir functions/api/auth.ts. */
-import { createUploadRoute } from 'inline-core/server';
+import { api } from '../../src/lib/api';
 
-const route = createUploadRoute();
+const route = api.routes['/api/upload'];
 
 export const onRequest = route.onRequest;
 export const onRequestPost = route.onRequestPost;

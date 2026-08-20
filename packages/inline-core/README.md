@@ -96,22 +96,57 @@ vers les sites.
 
 ### Les routes serveur
 
-L'hébergeur découvre les routes par l'arborescence de `/functions`. Chaque
-fichier y est un adaptateur, jamais une règle :
+Le site déclare ses routes une fois, et l'hébergeur s'y branche. La déclaration
+tient en une ligne :
+
+```ts
+// src/lib/api.ts
+import { createRouter } from 'inline-core/server';
+import { LOCALES } from './locales';
+
+export const api = createRouter({ locales: LOCALES });
+```
+
+`createRouter` renvoie les quatre routes sous deux formes. Chaque hébergeur
+prend celle qui lui convient — aucune n'est privilégiée, et le paquet n'en
+connaît aucun.
+
+**`api.routes`** — la table, pour un hébergeur qui découvre les routes par
+l'arborescence et attend des exports nommés :
 
 ```ts
 // functions/api/save.ts
-import { createSaveRoute } from 'inline-core/server';
-import { LOCALES } from '../../src/lib/locales';
+import { api } from '../../src/lib/api';
 
-const route = createSaveRoute({ locales: LOCALES });
+const route = api.routes['/api/save'];
 
 export const onRequest = route.onRequest;
 export const onRequestPost = route.onRequestPost;
 ```
 
-Quatre routes : `createAuthRoute()`, `createContentRoute(config)`,
-`createSaveRoute(config)`, `createUploadRoute()`.
+**`api.handle(request, env)`** — un point d'entrée unique, pour tous les autres.
+Il choisit la route et la méthode, répond 405 sur une méthode non servie et 404
+sur un chemin inconnu, toujours en JSON :
+
+```ts
+// netlify/functions/api.mts
+import { api } from '../../src/lib/api';
+
+export const config = { path: '/api/*' };
+
+export default (request: Request) => api.handle(request, process.env);
+```
+
+`env` porte ce que l'hébergeur expose : les variables, et les liaisons
+éventuelles — dont `RATE_LIMIT`.
+
+**`api.find(pathname)`** complète le tableau : elle renvoie la route servant un
+chemin, ou `undefined`. C'est ce qu'il faut pour séparer l'API du statique dans
+un serveur maison.
+
+Les quatre fabriques restent exportées — `createAuthRoute()`,
+`createContentRoute(config)`, `createSaveRoute(config)`, `createUploadRoute()` —
+pour un câblage à la main. `createRouter` ne fait que les réunir.
 
 ### Le modèle et les styles
 

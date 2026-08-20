@@ -89,9 +89,10 @@ d'autre.
 ```bash
 npm run dev              # Serveur Astro seul — le site, sans les fonctions ni l'édition
 npm run build            # Build de production (échoue si le contenu est invalide)
-npm run serve:functions  # Site + fonctions : c'est ici qu'on édite en local
+npm run serve            # Site + fonctions sur Node seul — aucun outil d'hébergeur
+npm run serve:functions  # Site + fonctions via l'outil de l'hébergeur
 npm run check            # HTML brut + parité des langues + journaux + aucun secret
-npm run test             # Git, authentification, durcissement, amorçage, assainissement, médias, HEIC, langues, overlay
+npm run test             # Git, authentification, durcissement, répartition, amorçage, assainissement, médias, HEIC, langues, overlay
 npm run create:site      # Régénère les accès d'un site : clé, empreinte, variables
 npm run test:scaffold    # Crée un site de zéro, l'installe, le construit, le contrôle
 npm run test:pack        # Idem, mais depuis les archives qu'une publication produirait
@@ -196,26 +197,82 @@ item à l'autre.
 ## Déploiement
 
 Le site est statique : n'importe quel hébergeur capable de servir des fichiers
-et d'exécuter des fonctions convient. La configuration livrée vise Cloudflare
-Pages ([wrangler.toml](wrangler.toml)) ; le dossier `/functions` se transpose
-sur les autres plateformes en adaptant la signature des handlers.
+et d'exécuter des fonctions convient. Les routes sont déclarées une seule fois,
+dans [src/lib/api.ts](src/lib/api.ts), et chaque hébergeur s'y branche par un
+adaptateur qui ne décide rien :
+
+```
+src/lib/api.ts             createRouter({ locales }) — la déclaration
+functions/api/*.ts         hébergeur qui découvre les routes par l'arborescence
+netlify/functions/api.mts  Netlify — un point d'entrée, un chemin déclaré
+scripts/serve.mjs          Node seul — conteneur, VPS, autre plateforme
+```
+
+Les dossiers d'un hébergeur qu'on n'utilise pas se suppriment sans rien casser.
+En ajouter un se fait dans un fichier, en appelant `api.handle(request, env)` —
+voir le [README d'inline-core](packages/inline-core/README.md).
 
 1. Connecter le dépôt à l'hébergeur. Commande de build : `npm run build`,
    dossier publié : `dist`.
 2. Déclarer les variables d'environnement du tableau ci-dessus **en secrets**,
    pas en variables de build : elles ne doivent jamais atteindre le navigateur.
-3. Déclarer une liaison clé-valeur nommée `RATE_LIMIT` (voir ci-dessous).
+3. Déclarer un stockage partagé pour le comptage des tentatives : liaison
+   clé-valeur `RATE_LIMIT` sur les plateformes qui en ont, stockage d'objets
+   sur Netlify (voir ci-dessous).
 4. Vérifier après déploiement : `curl -s https://monsite.fr/ | grep -c "votre titre"`
    doit renvoyer 1, et `curl -s -X POST https://monsite.fr/api/save` doit
    renvoyer 401.
 
-### La liaison `RATE_LIMIT`
+### L'échec qui ne se voit pas
+
+Un site déposé **sans ses fonctions** se construit, se sert et s'affiche
+parfaitement. Seule l'édition échoue, au moment d'entrer la clé : `/api/auth`
+répond 404 au lieu d'ouvrir une session, et rien à l'écran ne dit pourquoi. Les
+soupçons se portent alors sur la clé, qui n'y est pour rien.
+
+C'est le premier réflexe après un déploiement, quel que soit l'hébergeur :
+
+```bash
+curl -i https://monsite.fr/api/auth
+```
+
+`405 method_not_allowed` : les fonctions tournent, la clé fonctionnera. Du HTML
+ou un `404` : elles ne tournent pas, et aucune clé ne marchera.
+
+### Essayer en local, sans outil d'hébergeur
+
+```bash
+npm run build
+npm run serve          # PORT et HOST se règlent par l'environnement
+```
+
+`scripts/serve.mjs` sert `dist/` et `/api/*` dans un seul processus Node, en
+lisant les variables de l'environnement — complétées par `.dev.vars` puis `.env`
+s'ils existent, sans jamais écraser ce qui est déjà posé. C'est aussi ce qui
+permet de déposer le site sur une plateforme qui n'a pas d'adaptateur dédié.
+
+Pas de compression, pas de TLS : derrière un proxy, c'est suffisant ; exposé
+seul sur Internet, c'est un choix à assumer.
+
+### Le stockage partagé du comptage
 
 Le comptage des appels — tentatives de clé, publications, envois d'images — a
-besoin d'un état partagé entre les instances de la fonction. Sans la liaison,
-`inline` retombe sur un compteur en mémoire : suffisant en local,
-**insuffisant en production**, où chaque instance compterait pour elle seule et
-où un démarrage à froid remettrait tout à zéro.
+besoin d'un état partagé entre les instances de la fonction. Sans lui, `inline`
+retombe sur un compteur en mémoire : suffisant en local, **insuffisant en
+production**, où chaque instance compterait pour elle seule et où un démarrage
+à froid remettrait tout à zéro.
+
+Ce que chaque adaptateur branche :
+
+| Adaptateur | Stockage | Partagé entre instances |
+|---|---|---|
+| `functions/` | liaison clé-valeur nommée `RATE_LIMIT` | oui |
+| `netlify/` | stockage d'objets, activé sur le site | oui |
+| `scripts/serve.mjs` | mémoire du processus | non — une seule instance |
+
+Sur Netlify, l'adaptateur **écrit dans les journaux de la fonction** quand le
+stockage est indisponible et qu'il retombe en mémoire. C'est le seul signe :
+rien ne le montre à l'écran.
 
 Les espaces clé-valeur des hébergeurs sont à cohérence différée : la protection
 reste efficace contre une force brute — qui suppose des milliers d'essais —
@@ -252,7 +309,7 @@ Le dépôt est séparé en deux, et c'est toute la question de l'exploitation :
 ce qui est identique d'un client à l'autre est **partagé et versionné**, ce qui
 lui appartient est copié puis adapté.
 
-**Partagé — [packages/inline-core](packages/inline-core), version 2.0.0**
+**Partagé — [packages/inline-core](packages/inline-core), version 2.1.0**
 
 ```
 astro/                     L'intégration Astro
@@ -272,6 +329,7 @@ src/server/git-provider.ts Interface du fournisseur Git
 src/server/github.ts       Implémentation GitHub (version = SHA du blob)
 src/server/gitlab.ts       Signature + notes, non implémenté
 src/server/routes/         Les quatre routes, en fabriques configurables
+src/server/router.ts       createRouter — les réunit, sans connaître d'hébergeur
 styles/tokens.css          Correspondance enums du schéma → variables du thème
 ```
 
@@ -287,7 +345,11 @@ src/components/              Les vôtres — ceux d'inline viennent du paquet
 src/layouts/Base.astro       Métadonnées, éléments partagés
 src/pages/[lang]/            Les pages
 src/media/                   Les images téléversées
-functions/api/*.ts           Quatre adaptateurs de trois lignes
+src/lib/api.ts               Les routes de CE site — une ligne, comme locales.ts
+functions/api/*.ts           Adaptateur : hébergeur à découverte par arborescence
+netlify/functions/api.mts    Adaptateur : Netlify
+netlify.toml                 Sa configuration — pendant de wrangler.toml
+scripts/serve.mjs            Adaptateur : Node seul (conteneur, VPS, autre)
 scripts/                     Contrôles et outils de test
 ```
 

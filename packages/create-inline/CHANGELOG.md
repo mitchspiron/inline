@@ -10,6 +10,59 @@ Versionnage sémantique, avec une règle qui lui est propre :
 
 ---
 
+## 1.2.0
+
+Le site créé peut être déposé chez trois familles d'hébergeurs sans qu'une ligne
+de son code change. Avant, le modèle ne livrait que les adaptateurs d'un seul :
+déposé ailleurs, le site s'affichait normalement et refusait la clé, sans que
+rien ne dise pourquoi.
+
+### Ajouté
+
+- **`src/lib/api.ts`** — les routes du site, en une ligne :
+  `createRouter({ locales: LOCALES })`. C'est de la configuration, comme
+  `locales.ts` ; la répartition vit dans `inline-core` (≥ 2.1.0) et se met à
+  jour avec lui.
+- **`netlify/functions/api.mts` et `netlify.toml`** — l'adaptateur Netlify. Une
+  seule fonction pour les quatre routes, aucune redirection à écrire. Il traduit
+  les deux seuls écarts : `process.env` au lieu des liaisons, et le stockage
+  d'objets de Netlify au lieu d'un espace clé-valeur pour le comptage des
+  tentatives. Si ce stockage est indisponible, le comptage retombe en mémoire
+  **et le dit dans les journaux**.
+- **`scripts/serve.mjs` et `npm run serve`** — le site et ses routes servis par
+  Node seul, sans outil d'hébergeur : un conteneur, une machine, n'importe
+  quelle plateforme qui lance un processus. C'est aussi le moyen le plus court
+  d'essayer les routes en local.
+- **`@netlify/blobs` en dépendance, `esbuild` en dépendance de développement**
+  du site créé — pour les deux points ci-dessus.
+
+### Changé
+
+- **Les quatre adaptateurs de `functions/api/` ne construisent plus les
+  routes** : ils réexportent celles de `src/lib/api.ts`. Le comportement est
+  identique ; la déclaration n'existe plus qu'à un seul endroit.
+- **`check-logs.mjs` inspecte aussi `netlify/`.** Un adaptateur reçoit les
+  variables : c'est du code à portée de secrets, quel que soit l'hébergeur.
+- **Le message de fin rappelle la vérification d'après déploiement**
+  (`curl -i https://<le-site>/api/auth` → 405). Un site déposé sans ses
+  fonctions est le seul échec d'`inline` qui ne se voit pas à l'écran.
+- **`inline-core` est demandé en `^2.1.0`**, version qui expose `createRouter`.
+
+### Ce qu'un site déjà livré doit faire pour rattraper
+
+Rien n'est cassé : un site en 1.1.0 continue de fonctionner chez son hébergeur
+d'origine. Pour gagner la portabilité, quatre gestes, dans cet ordre :
+
+1. `npm update inline-core` (≥ 2.1.0) ;
+2. créer `src/lib/api.ts` avec la ligne `createRouter` ;
+3. y brancher les quatre fichiers de `functions/api/` ;
+4. copier `netlify/`, `netlify.toml` et `scripts/serve.mjs` depuis un site créé
+   avec cette version.
+
+Le plus simple reste de générer un site neuf à côté et d'y prendre les fichiers.
+
+---
+
 ## 1.1.0
 
 Le site créé sait régénérer sa propre clé. Avant, la commande n'existait que

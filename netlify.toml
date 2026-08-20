@@ -1,0 +1,31 @@
+# Configuration de l'hébergeur Netlify, pendant de wrangler.toml.
+#
+# Aucun secret ici. Les variables se déclarent dans la configuration du site
+# (Site configuration → Environment variables), jamais dans le dépôt — règle 4.
+#
+# Les routes ne sont pas décrites dans ce fichier : la fonction
+# netlify/functions/api.mts déclare elle-même le chemin qu'elle sert, et la
+# liste des routes vit dans `inline-core`.
+#
+# Site déposé ailleurs ? Ce fichier ne gêne pas, et se supprime.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  # Le site est statique ; seules les fonctions tournent sous Node.
+  NODE_VERSION = "22"
+
+[functions]
+  directory = "netlify/functions"
+  # Les fonctions importent du TypeScript depuis src/ et node_modules :
+  # esbuild les assemble en un seul module, sans étape de compilation à part.
+  node_bundler = "esbuild"
+
+# « netlify dev » : le serveur de développement d'Astro sert les pages, Netlify
+# ajoute /api/* par-dessus. Les variables sont lues dans .env, pas .dev.vars.
+[dev]
+  command = "npm run dev"
+  targetPort = 4321
+  framework = "#custom"

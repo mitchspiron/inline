@@ -1,17 +1,28 @@
 /**
  * Ce que `inline-core` expose aux fonctions serveur d'un site.
  *
- * Un site ne contient que des adaptateurs de trois lignes : une fabrique
- * appelée avec la configuration du site, et les gestionnaires réexportés sous
- * les noms qu'attend l'hébergeur. Toute la logique — identité, débit,
- * plafonds, chemins, schéma, verrou optimiste, écriture — vit ici et se met à
- * jour d'un seul coup pour tous les sites.
+ * Un site ne contient que des adaptateurs de trois lignes : `createRouter`
+ * appelé avec la configuration du site, et le résultat branché sous la forme
+ * qu'attend l'hébergeur. Toute la logique — identité, débit, plafonds,
+ * chemins, schéma, verrou optimiste, écriture, répartition — vit ici et se met
+ * à jour d'un seul coup pour tous les sites.
+ *
+ * L'hébergeur n'est jamais tranché ici : `createRouter` ne connaît ni les
+ * conventions de fichiers, ni les liaisons, ni les variables d'aucun d'eux.
  *
  * Les deux points de couplage restent isolés, et deux seulement :
  *
  *   server/git-provider.ts   readFile / writeFile        (GitHub | GitLab)
  *   server/auth.ts           verifyAuth / createSession  (clé de site | délégué)
  */
+export {
+  createRouter,
+  ROUTE_PATHS,
+  type Router,
+  type Route,
+  type RouteHandler,
+} from './router';
+
 export { createAuthRoute } from './routes/auth';
 export { createContentRoute } from './routes/content';
 export { createSaveRoute, sanitizeMessage } from './routes/save';

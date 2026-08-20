@@ -51,11 +51,35 @@ Puis, dans trois terminaux à la racine du projet :
 ```bash
 npm run mock:git         # faux dépôt local, pour publier sans rien brancher
 npm run build
-npm run serve:functions
+npm run serve            # ou « npm run serve:functions » avec l'outil de l'hébergeur
 ```
 
 Ouvrez `http://127.0.0.1:8788/admin`, saisissez la clé affichée à la création,
 modifiez un texte sur la page, cliquez sur Publier.
+
+## L'hébergeur n'est pas tranché
+
+Le site créé porte un adaptateur par famille de plateformes. Aucun ne contient
+de règle : les routes sont déclarées une seule fois, dans `src/lib/api.ts`.
+
+```
+functions/api/*.ts         hébergeur qui découvre les routes par l'arborescence
+netlify/functions/api.mts  Netlify (avec netlify.toml)
+scripts/serve.mjs          Node seul — conteneur, VPS, autre plateforme
+```
+
+Les dossiers d'un hébergeur qu'on n'utilise pas se suppriment sans rien casser.
+
+**Après le premier déploiement, une commande avant toutes les autres :**
+
+```bash
+curl -i https://votre-site.fr/api/auth
+```
+
+`405` : les fonctions tournent. Du HTML, ou `404` : elles ne tournent pas. Un
+site déposé sans ses fonctions s'affiche parfaitement et refuse la clé — c'est
+le seul échec d'`inline` qui ne se voit pas à l'écran, et il fait soupçonner la
+clé, qui n'y est pour rien.
 
 ## Clé perdue, clé à changer
 

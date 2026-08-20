@@ -9,6 +9,55 @@ Versionnage sémantique, avec une règle qui lui est propre :
 
 ---
 
+## 2.1.0
+
+L'hébergeur cesse d'être un choix qu'on fait une fois. Avant, les quatre routes
+n'existaient que sous la forme qu'attend un hébergeur précis — un fichier par
+route, des exports nommés `onRequest<Méthode>`. Le site marchait chez celui-là,
+et nulle part ailleurs sans réécrire ses adaptateurs.
+
+C'est une addition : rien de ce qui existait ne change de comportement.
+
+### Ajouté
+
+- **`createRouter({ locales })`**, exporté par `inline-core/server`. Il renvoie
+  les quatre routes sous deux formes, au choix de l'hébergeur :
+
+  - `routes` — la table, pour ceux qui veulent un fichier par route et des
+    exports nommés ;
+  - `handle(request, env)` — un point d'entrée unique, pour tous les autres ;
+  - `find(pathname)` — la route servant un chemin, barre oblique finale
+    ignorée, pour séparer l'API du statique dans un serveur maison.
+
+  La répartition — quelle méthode, quel gestionnaire, 404 ou 405 — vit
+  désormais dans le paquet et non plus dans chaque site. Un site n'en garde que
+  sa configuration : `createRouter({ locales: LOCALES })`, une ligne.
+
+- **`ROUTE_PATHS`**, la liste des chemins servis. Utile à un adaptateur qui doit
+  déclarer ses routes à l'avance.
+
+- **Les types `Router`, `Route`, `RouteHandler`.**
+
+### Inchangé, et volontairement
+
+- **Le paquet ne connaît toujours aucun hébergeur** — règle 4. `createRouter`
+  ignore les conventions de fichiers, les liaisons et les variables de chacun
+  d'eux ; un contrôle de la suite de tests refuse qu'un nom de produit
+  apparaisse dans `router.ts`. Ce qui est propre à un hébergeur reste dans le
+  site, où le choix se fait.
+- **Les fabriques `createAuthRoute`, `createContentRoute`, `createSaveRoute`,
+  `createUploadRoute` restent exportées** et se comportent à l'identique. Un
+  site en 2.0.x n'a rien à changer.
+
+### Pour en profiter dans un site existant
+
+`npm update inline-core`, puis remplacer le contenu des quatre adaptateurs de
+`functions/api/` par un branchement sur un `src/lib/api.ts` d'une ligne. Voir le
+README, section « Le déploiement ». Rien n'y oblige : les anciens adaptateurs
+continuent de fonctionner.
+
+---
+
 ## 2.0.1
 
 Rien dans le code : les fichiers publiés sont identiques à ceux de la 2.0.0.

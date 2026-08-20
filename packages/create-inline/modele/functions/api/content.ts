@@ -1,8 +1,7 @@
 /** Adaptateur de route — voir functions/api/auth.ts. */
-import { createContentRoute } from 'inline-core/server';
-import { LOCALES } from '../../src/lib/locales';
+import { api } from '../../src/lib/api';
 
-const route = createContentRoute({ locales: LOCALES });
+const route = api.routes['/api/content'];
 
 export const onRequest = route.onRequest;
 export const onRequestGet = route.onRequestGet;

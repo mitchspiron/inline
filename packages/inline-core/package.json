@@ -1,6 +1,6 @@
 {
   "name": "inline-core",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Édition de contenu en front pour sites statiques Astro — la partie partagée entre tous les sites.",
   "type": "module",
   "license": "BUSL-1.1",

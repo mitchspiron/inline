@@ -1,6 +1,6 @@
 {
   "name": "create-inline",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Crée un site inline prêt à éditer : npm create inline@latest mon-site",
   "type": "module",
   "license": "BUSL-1.1",

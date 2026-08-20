@@ -105,11 +105,32 @@ référence et `npm run check` le signale.
 
 ## 5. Déployer
 
-1. Créer le projet chez l'hébergeur, branché sur le dépôt.
+Le site porte un adaptateur par famille d'hébergeurs. Choisir celui de la
+plateforme visée ; les autres dossiers se suppriment sans rien casser.
+
+| Plateforme | Ce qui sert les routes | Comptage des tentatives |
+|---|---|---|
+| découverte par arborescence | `functions/` + `wrangler.toml` | liaison `RATE_LIMIT` |
+| Netlify | `netlify/` + `netlify.toml` | stockage d'objets du site |
+| conteneur, VPS, autre | `npm run serve` | mémoire — **une seule instance** |
+
+1. Créer le projet chez l'hébergeur, branché sur le dépôt. Commande de build :
+   `npm run build`, dossier publié : `dist`.
 2. Poser les variables affichées par `create:site` en **secrets d'exécution**,
    jamais en variables de build : elles ne doivent pas atteindre le navigateur.
-3. Déclarer la liaison clé-valeur `RATE_LIMIT`.
-4. Vérifier :
+3. Activer le stockage partagé du comptage, selon la colonne ci-dessus.
+4. Vérifier **d'abord que les fonctions tournent** :
+
+```bash
+curl -i https://le-site.fr/api/auth        # 405 method_not_allowed
+```
+
+   C'est le contrôle qui vient en premier, avant tous les autres. Un site
+   déposé en statique sans ses fonctions s'affiche parfaitement et refuse la
+   clé : si cette commande renvoie du HTML ou un 404, rien d'autre ne sert à
+   être testé, et aucune clé ne marchera.
+
+5. Puis le reste :
 
 ```bash
 curl -s https://le-site.fr/ | grep -c "un titre de la page"   # 1
@@ -119,6 +140,10 @@ curl -s -X POST https://le-site.fr/api/save                   # 401
 Puis, à la main : cinq clés fausses de suite sur `/admin` doivent finir par un
 message d'attente. Si la sixième tentative est encore refusée par « clé
 incorrecte », la limitation de débit n'est pas active — ne pas livrer.
+
+Sur Netlify, ce cas a une cause fréquente et un signe précis : le stockage
+d'objets n'est pas activé, et l'adaptateur l'écrit dans les journaux de la
+fonction en retombant sur un compteur en mémoire.
 
 ---
 

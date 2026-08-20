@@ -24,7 +24,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const MODELE = join(here, 'modele');
 
 /** Version d'`inline-core` posée en dépendance du site créé. */
-const CORE_VERSION = '^2.0.0';
+const CORE_VERSION = '^2.1.0';
 const ASTRO_VERSION = '^5.2.5';
 /**
  * `scripts/make-key.mjs` en a besoin. Déclaré explicitement, et pas laissé au
@@ -33,6 +33,21 @@ const ASTRO_VERSION = '^5.2.5';
  * imbriquée, la commande échouerait sur un module introuvable.
  */
 const HASHES_VERSION = '^2.3.0';
+/**
+ * `scripts/serve.mjs` assemble les routes au démarrage. Même raisonnement que
+ * ci-dessus : le paquet arrive par `inline-core`, mais rien ne garantit qu'il
+ * soit hissé à la racine.
+ */
+const ESBUILD_VERSION = '^0.28.2';
+/**
+ * Le comptage des tentatives sur Netlify. Dépendance normale et non de
+ * développement : elle doit survivre à une installation de production, sinon
+ * l'assemblage de la fonction échoue au déploiement.
+ *
+ * Site déposé ailleurs ? L'import est dynamique et n'est jamais atteint : la
+ * ligne se retire de package.json avec le dossier netlify/.
+ */
+const NETLIFY_BLOBS_VERSION = '^10.7.13';
 
 function option(name, fallback = '') {
   const index = process.argv.indexOf(`--${name}`);
@@ -133,6 +148,9 @@ writeFileSync(
       scripts: {
         dev: 'astro dev',
         build: 'astro build',
+        // Trois façons de servir le site avec ses routes. La troisième ne
+        // dépend d'aucun hébergeur — voir README, « Le déploiement ».
+        serve: 'node scripts/serve.mjs',
         'serve:functions': 'wrangler pages dev',
         'mock:git': 'node scripts/mock-git-api.mjs',
         // Une clé perdue se régénère, elle ne se retrouve pas : la commande
@@ -141,11 +159,13 @@ writeFileSync(
         check: 'node scripts/check-html.mjs && node scripts/check-locales.mjs && node scripts/check-logs.mjs && node scripts/check-secrets.mjs',
       },
       dependencies: {
+        '@netlify/blobs': NETLIFY_BLOBS_VERSION,
         astro: ASTRO_VERSION,
         'inline-core': CORE_VERSION,
       },
       devDependencies: {
         '@noble/hashes': HASHES_VERSION,
+        esbuild: ESBUILD_VERSION,
         wrangler: '^3.107.2',
       },
     },
@@ -174,6 +194,7 @@ dist/
 
 # Outils
 .wrangler/
+.netlify/
 *.log
 .DS_Store
 `,
@@ -247,4 +268,16 @@ console.log(`
   Ensuite : votre charte dans src/styles/theme.css, votre contenu dans
   src/content/, vos images dans src/media/. La logique d'édition vit dans
   inline-core — un « npm update inline-core » suffit à la mettre à jour.
+
+  Pour la mise en ligne, l'hébergeur n'est pas tranché : functions/ pour ceux
+  qui découvrent les routes par l'arborescence, netlify/ pour Netlify, ou
+  « npm run serve » sur n'importe quelle plateforme qui lance un processus
+  Node. Les dossiers inutilisés se suppriment sans rien casser.
+
+  Un site déposé sans ses fonctions s'affiche mais refuse la clé. Après le
+  premier déploiement, vérifiez-le en une commande :
+
+      curl -i https://<votre-site>/api/auth
+
+  405 : les fonctions tournent. Autre chose : elles ne tournent pas.
 `);

@@ -1,13 +1,14 @@
 /**
- * Adaptateur de route. Toute la logique vit dans `inline-core` : identité,
- * limitation de débit, plafonds, chemins, schéma, verrou optimiste, écriture.
+ * Adaptateur de route pour un hébergeur qui découvre les routes par
+ * l'arborescence de /functions.
  *
- * Ce fichier n'existe que parce que l'hébergeur découvre les routes par
- * l'arborescence de /functions. Il ne doit jamais contenir de règle.
+ * Les routes sont déclarées dans src/lib/api.ts, une fois pour tous les
+ * hébergeurs. Ce fichier n'existe que pour donner à celui-ci le chemin et les
+ * noms d'export qu'il attend. Il ne doit jamais contenir de règle.
  */
-import { createAuthRoute } from 'inline-core/server';
+import { api } from '../../src/lib/api';
 
-const route = createAuthRoute();
+const route = api.routes['/api/auth'];
 
 export const onRequest = route.onRequest;
 export const onRequestPost = route.onRequestPost;
