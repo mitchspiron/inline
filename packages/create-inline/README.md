@@ -23,9 +23,10 @@ npm create inline@latest mon-site -- --nom "Boulangerie Martin" --courriel conta
 ## Ce que ça écrit
 
 Le squelette du site : la mise en page, une page de contenu, la charte, les
-quatre adaptateurs de routes de `/functions`, les contrôles et l'intégration
-continue. Puis la clé du site, **affichée une seule fois** — elle est aussi
-posée dans `.dev.vars`, qui n'entrera jamais dans le dépôt.
+quatre adaptateurs de routes de `/functions`, les contrôles, la commande de
+génération de clé et l'intégration continue. Puis la clé du site, **affichée
+une seule fois** — elle est aussi posée dans `.dev.vars`, qui n'entrera jamais
+dans le dépôt.
 
 ## Ce que ça n'écrit pas
 
@@ -52,6 +53,23 @@ npm run serve:functions
 
 Ouvrez `http://127.0.0.1:8788/admin`, saisissez la clé affichée à la création,
 modifiez un texte sur la page, cliquez sur Publier.
+
+## Clé perdue, clé à changer
+
+La clé n'est stockée nulle part sous forme lisible : seule son empreinte
+argon2id vit en variable d'environnement. Elle ne se retrouve donc pas, elle se
+régénère — et c'est voulu.
+
+```bash
+npm run make:key
+```
+
+La commande affiche la nouvelle clé, son empreinte et un secret de session.
+Ensuite : remplacer `EDITOR_KEY_HASH` chez l'hébergeur, remplacer
+`SESSION_SECRET` si vous voulez fermer immédiatement les sessions ouvertes,
+redéployer — les variables ne sont relues qu'au déploiement — puis transmettre
+la nouvelle clé au client. L'ancienne cesse de fonctionner au redéploiement : il
+n'y a pas de période de recouvrement.
 
 ## Prérequis
 

@@ -139,6 +139,7 @@ if (packed) {
     ['le modèle de contenu', 'modele/src/content/pages/fr/home.json'],
     ['les adaptateurs de routes', 'modele/functions/api/save.ts'],
     ['les contrôles', 'modele/scripts/check-html.mjs'],
+    ['la génération de clé', 'modele/scripts/make-key.mjs'],
     ['l\'intégration continue', 'modele/.github/workflows/ci.yml'],
     ['le modèle de variables', 'modele/.env.example'],
   ]) {
@@ -189,6 +190,7 @@ for (const file of [
   'src/pages/[lang]/[...slug].astro',
   'src/styles/theme.css',
   'scripts/check-html.mjs',
+  'scripts/make-key.mjs',
   '.github/workflows/ci.yml',
 ]) {
   check(`${file} est présent`, existsSync(join(project, file)));
@@ -231,6 +233,19 @@ if (/GIT_API_BASE=http:\/\/127\.0\.0\.1/.test(devVars)) {
     /mock:git/.test(created.output),
   );
 }
+/**
+ * Une clé perdue se régénère, elle ne se retrouve pas — encore faut-il que la
+ * commande vive là où vit le site. Sans ce contrôle, la rotation n'est possible
+ * que depuis le dépôt de référence, c'est-à-dire nulle part pour qui a reçu un
+ * site livré.
+ */
+check('la commande de clé est livrée', existsSync(join(project, 'scripts/make-key.mjs')));
+check(
+  'et elle est déclarée dans le projet',
+  JSON.parse(readFileSync(join(project, 'package.json'), 'utf8')).scripts['make:key'] !== undefined,
+);
+check('le mode d\'emploi affiché la mentionne', /make:key/.test(created.output));
+
 check('l\'empreinte de la clé est posée, pas la clé', /EDITOR_KEY_HASH=\$argon2id\$/.test(devVars));
 check('la clé en clair n\'est nulle part sur disque', !devVars.includes('EDITOR_KEY='));
 check(
@@ -255,6 +270,18 @@ console.log('\nInstallation et build');
 // développement qu'on veut mettre à l'épreuve, pas la dernière publiée.
 const installed = run('npm', ['install', '--no-audit', '--no-fund', coreSpecifier], project);
 check('les dépendances s\'installent', installed.code === 0, installed.output.slice(-600));
+
+/**
+ * La génération de clé n'installe rien : elle s'appuie sur la bibliothèque de
+ * hachage qui arrive avec `inline-core`. Le contrôle porte donc autant sur la
+ * commande que sur cette dépendance transitive.
+ */
+const keyed = run('npm', ['run', 'make:key'], project);
+check('le site sait régénérer sa clé', keyed.code === 0, keyed.output.slice(-400));
+check(
+  'et il en sort une empreinte argon2id',
+  /EDITOR_KEY_HASH=\$argon2id\$v=19\$m=\d+,t=\d+,p=\d+\$/.test(keyed.output),
+);
 
 const built = run('npm', ['run', 'build'], project);
 check('le site construit', built.code === 0, built.output.slice(-800));

@@ -128,6 +128,9 @@ writeFileSync(
         build: 'astro build',
         'serve:functions': 'wrangler pages dev',
         'mock:git': 'node scripts/mock-git-api.mjs',
+        // Une clé perdue se régénère, elle ne se retrouve pas : la commande
+        // doit vivre là où vit le site, pas seulement chez qui l'a créé.
+        'make:key': 'node scripts/make-key.mjs',
         check: 'node scripts/check-html.mjs && node scripts/check-locales.mjs && node scripts/check-logs.mjs && node scripts/check-secrets.mjs',
       },
       dependencies: {
@@ -226,7 +229,9 @@ console.log(`
           ${key}
 
       Elle est déjà dans .dev.vars, qui n'entrera jamais dans le dépôt. Pour
-      la production, régénérez-en une et posez les variables chez l'hébergeur.
+      la production, régénérez-en une avec « npm run make:key » et posez les
+      variables chez l'hébergeur. C'est aussi la commande de rotation, le jour
+      où cette clé sera perdue ou à changer.
 
   4.  Modifiez un texte sur la page, cliquez sur Publier. La publication
       écrit dans src/content/ — relancez le build pour la voir figée.
