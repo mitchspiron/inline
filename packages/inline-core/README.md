@@ -129,7 +129,7 @@ Il choisit la route et la méthode, répond 405 sur une méthode non servie et 4
 sur un chemin inconnu, toujours en JSON :
 
 ```ts
-// netlify/functions/api.mts
+// netlify/source/api.mts — assemblé au build en netlify/functions/api.mjs
 import { api } from '../../src/lib/api';
 
 export const config = { path: '/api/*' };

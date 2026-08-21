@@ -70,6 +70,14 @@ scripts/serve.mjs          Node seul — conteneur, VPS, autre plateforme
 
 Les dossiers d'un hébergeur qu'on n'utilise pas se suppriment sans rien casser.
 
+Sur Netlify, la commande de build est en deux temps —
+`npm run build && npm run build:netlify` — et **`node_bundler` ne doit pas être
+déclaré** dans `netlify.toml`. Netlify produirait alors du CommonJS : la
+fonction serait prise pour une v1, et le site répondrait *502 « handler is not a
+function »* au moment précis où le client entre sa clé. Le dépôt assemble donc
+lui-même la fonction, et `build-netlify.mjs` vérifie son propre produit avant de
+rendre la main.
+
 **Après le premier déploiement, une commande avant toutes les autres :**
 
 ```bash
